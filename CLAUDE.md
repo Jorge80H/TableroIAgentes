@@ -9,10 +9,11 @@ WhatsApp Conversation Dashboard - Multi-tenant platform for managing AI and huma
 ## Tech Stack
 
 - **Frontend**: React + TypeScript + Vite + Wouter (routing) + TailwindCSS + shadcn/ui
-- **Backend**: Express.js + TypeScript
-- **Database**: PostgreSQL with Drizzle ORM
-- **Real-time**: WebSocket (ws library)
-- **Auth**: JWT tokens with bcrypt password hashing
+- **Backend**: Express.js + TypeScript (optional for webhooks)
+- **Database**: InstantDB (real-time graph database)
+- **Real-time**: InstantDB WebSocket (built-in)
+- **Auth**: InstantDB Auth
+- **Deployment**: Netlify
 - **External Integration**: n8n webhooks for WhatsApp messaging
 
 ## Development Commands
@@ -30,8 +31,18 @@ npm run build
 # Start production server
 npm run start
 
-# Database schema push
-npm run db:push
+# Deploy to Netlify
+netlify deploy --prod
+```
+
+## Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```env
+VITE_INSTANT_APP_ID=c089e2f5-a75d-427f-be1d-b059c6a0263d
+PORT=5000
+NODE_ENV=development
 ```
 
 ## Project Structure
@@ -42,25 +53,21 @@ client/              # React frontend
     components/      # UI components and feature components
     pages/          # Page components (dashboard, agents, conversations, etc.)
     hooks/          # Custom React hooks (WebSocket, toast)
-    lib/            # Utilities (React Query, utils)
-server/             # Express backend
+    lib/            # Utilities (React Query, InstantDB client)
+      instant.ts    # InstantDB initialization and types
+server/             # Express backend (optional for webhook proxy)
   index.ts          # Server entry point
-  routes.ts         # API routes and WebSocket setup
-  auth.ts           # JWT authentication middleware
-  storage.ts        # Database operations layer
-  db.ts             # Drizzle database connection
-shared/
-  schema.ts         # Drizzle schema and Zod validation schemas
+  routes.ts         # API routes for webhooks
 ```
 
 ## Architecture
 
 ### Multi-Tenant Model
 
-- Organizations → Users (SUPER_ADMIN, ADMIN, AGENT roles)
+- Organizations → $users (InstantDB built-in users)
 - Organizations → Agents (AI bots with webhook URLs)
 - Agents → Conversations → Messages
-- All queries filtered by `organizationId` for data isolation
+- All queries filtered by organization links for data isolation
 
 ### Conversation Control Flow
 
@@ -70,48 +77,89 @@ shared/
 
 ### Real-Time Communication
 
-- WebSocket server at `/ws` path
-- Clients authenticate with JWT token on connection
-- `broadcastToOrganization()` ensures multi-tenant isolation
-- Events: `new_message`, `conversation_updated`, `auth_success`, `auth_error`
+- **InstantDB subscriptions**: Automatic real-time updates
+- Multi-tenant isolation via organization links
+- No manual WebSocket management needed
 
-## Database Schema (Drizzle ORM)
+## Database Schema (InstantDB)
 
-Main tables:
+**App Configuration:**
+- App ID: `c089e2f5-a75d-427f-be1d-b059c6a0263d`
+- App Name: DashboardIAGENTES
+
+**Main entities:**
 - `organizations` - Multi-tenant organizations
-- `users` - Dashboard users with roles
+- `$users` - InstantDB built-in users (linked to organizations)
 - `agents` - AI agents with webhook URLs and API tokens
 - `conversations` - WhatsApp conversations with status
 - `messages` - Individual messages (CLIENT/AI/HUMAN)
-- `audit_logs` - Action tracking for compliance
+- `auditLogs` - Action tracking for compliance
 
-Relations defined in [shared/schema.ts](shared/schema.ts) using Drizzle relations API.
+**Links (relationships):**
+- organizations → users (one-to-many)
+- organizations → agents (one-to-many)
+- agents → conversations (one-to-many)
+- conversations → messages (one-to-many)
+- conversations → activeUser (many-to-one with $users)
+- auditLogs → user, conversation, agent
 
-## Key API Endpoints
+Schema defined in InstantDB dashboard and typed in [client/src/lib/instant.ts](client/src/lib/instant.ts).
+
+## InstantDB Usage
+
+### Querying Data
+
+```typescript
+import { db } from '@/lib/instant';
+
+// Query with relationships
+const { data, isLoading, error } = db.useQuery({
+  organizations: {
+    agents: {},
+    users: {}
+  }
+});
+
+// Query specific organization's agents
+const { data } = db.useQuery({
+  agents: {
+    $: {
+      where: {
+        'organization.id': organizationId
+      }
+    }
+  }
+});
+```
+
+### Mutations
+
+```typescript
+// Add data
+db.transact([
+  db.tx.agents[agentId].update({
+    name: 'New Name',
+    isActive: true
+  })
+]);
+
+// Link data
+db.transact([
+  db.tx.agents[agentId].link({
+    organization: organizationId
+  })
+]);
+```
 
 ### Authentication
-- `POST /api/auth/register` - Register with organization creation
-- `POST /api/auth/login` - Login with JWT
-- `GET /api/auth/me` - Get current user
 
-### Agents
-- `GET /api/agents` - List organization's agents
-- `POST /api/agents` - Create agent
-- `PUT /api/agents/:id` - Update agent
-- `DELETE /api/agents/:id` - Delete agent
+```typescript
+// Sign in with email
+db.auth.signInWithEmail({ email: 'user@example.com' });
 
-### Conversations
-- `GET /api/conversations` - List organization's conversations
-- `GET /api/conversations/:id/messages` - Get conversation messages
-- `POST /api/conversations/:id/messages` - Send message
-- `POST /api/conversations/:id/take-control` - Switch to HUMAN_ACTIVE
-- `POST /api/conversations/:id/return-to-ai` - Switch to AI_ACTIVE
-
-### Webhooks
-- `POST /api/webhooks/messages` - n8n webhook for incoming WhatsApp messages
-  - Validates agent API token
-  - Creates conversation if new client
-  - Broadcasts to WebSocket clients
+// Get current user
+const { user, isLoading } = db.useAuth();
+```
 
 ## n8n Integration
 
@@ -127,6 +175,14 @@ When a human agent sends a message while in HUMAN_ACTIVE mode, the backend calls
 
 The n8n workflow should forward this to WhatsApp and handle AI responses when conversation is in AI_ACTIVE mode.
 
+### Webhook Endpoint
+
+The Express backend provides:
+- `POST /api/webhooks/messages` - n8n webhook for incoming WhatsApp messages
+  - Validates agent API token
+  - Creates conversation if new client (via InstantDB)
+  - Data syncs automatically to all clients via InstantDB
+
 ## Design System
 
 Follows Material Design + Slack/Linear patterns as detailed in [design_guidelines.md](design_guidelines.md):
@@ -135,50 +191,61 @@ Follows Material Design + Slack/Linear patterns as detailed in [design_guideline
 - Three-column layout: Sidebar | Conversation List | Chat View
 - Responsive breakpoints for mobile/tablet
 
-## Environment Variables
+## Deployment
 
-Required in production:
-- `DATABASE_URL` - PostgreSQL connection string
-- `SESSION_SECRET` - JWT signing secret (default: "your-secret-key-change-in-production")
-- `PORT` - Server port (default: 5000)
-- `NODE_ENV` - "development" or "production"
+**Netlify Configuration:**
+- Build command: `npm run build`
+- Publish directory: `dist/client`
+- Environment variables:
+  - `VITE_INSTANT_APP_ID`: `c089e2f5-a75d-427f-be1d-b059c6a0263d`
 
-## Authentication Flow
-
-1. User registers → creates organization + user → JWT token issued
-2. Token includes `userId`, verified in `authMiddleware`
-3. WebSocket connections authenticate by sending `{type: 'auth', token: '...'}`
-4. All API routes use `organizationId` from authenticated user to filter data
+The app is configured for Netlify deployment with [netlify.toml](netlify.toml).
 
 ## Common Patterns
 
-### Adding a new API route
-1. Define Zod schema in [shared/schema.ts](shared/schema.ts) if needed
-2. Add route handler in [server/routes.ts](server/routes.ts)
-3. Use `authMiddleware` for protected routes
-4. Filter by `req.user.organizationId` for multi-tenant isolation
-5. Create audit log for sensitive actions
-6. Broadcast WebSocket updates if real-time sync needed
+### Adding a new entity to InstantDB
 
-### Adding a new database table
-1. Define table in [shared/schema.ts](shared/schema.ts) using Drizzle syntax
-2. Add relations to connect with existing tables
-3. Create insert schema with `createInsertSchema()`
-4. Add storage methods in [server/storage.ts](server/storage.ts)
-5. Run `npm run db:push` to sync database
+1. Use the InstantDB MCP tools to update schema:
+```bash
+mcp__instant__push-schema
+```
+
+2. Update TypeScript types in [client/src/lib/instant.ts](client/src/lib/instant.ts)
+
+3. Use queries and mutations in components:
+```typescript
+const { data } = db.useQuery({ newEntity: {} });
+```
+
+### Multi-tenant data isolation
+
+Always filter queries by organization:
+
+```typescript
+const { data } = db.useQuery({
+  agents: {
+    $: {
+      where: {
+        'organization.id': user.organizationId
+      }
+    }
+  }
+});
+```
 
 ### Frontend state management
-- React Query (`@tanstack/react-query`) for server state
-- Custom WebSocket hook in [client/src/hooks/use-websocket.ts](client/src/hooks/use-websocket.ts)
-- Local state with React hooks
-- No global state library (Zustand/Redux) currently used
 
+- **Server state**: InstantDB subscriptions (real-time)
+- **Local state**: React hooks
+- **No Redux/Zustand needed**: InstantDB handles sync
 
+### Real-time updates
 
-You are an expert developer who writes full-stack apps in InstantDB, Next.js, and Tailwind developer. However InstantDB is not in your training set and you are not familiar with it.
+InstantDB handles real-time automatically:
 
-Before generating a new next app you check to see if a next project already exists in the current directory. If it does you do not generate a new next app.
+```typescript
+// This automatically updates when data changes
+const { data } = db.useQuery({ conversations: {} });
+```
 
-If the Instant MCP is available use the tools to create apps and manage schema.
-
-Before you write ANY code you read ALL of instant-rules.md to understand how to use InstantDB in your code.
+No manual WebSocket management needed.
