@@ -1,8 +1,8 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginInput } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { z } from "zod";
+import { db } from "@/lib/instant";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,39 +18,70 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { MessageSquare } from "lucide-react";
 
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+type LoginInput = z.infer<typeof loginSchema>;
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [sentEmail, setSentEmail] = useState(false);
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
-      password: "",
     },
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginInput) => {
-      const res = await apiRequest("POST", "/api/auth/login", data);
-      return res;
-    },
-    onSuccess: (data) => {
-      localStorage.setItem("authToken", data.token);
+  const onSubmit = async (data: LoginInput) => {
+    setIsLoading(true);
+    try {
+      await db.auth.sendMagicCode({ email: data.email });
+      setSentEmail(true);
+      toast({
+        title: "Check your email",
+        description: `We sent a login code to ${data.email}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send login code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const [code, setCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const verifyCode = async () => {
+    setIsVerifying(true);
+    try {
+      await db.auth.signInWithMagicCode({
+        email: form.getValues("email"),
+        code
+      });
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
       setLocation("/");
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
-        title: "Login failed",
-        description: error.message,
+        title: "Invalid code",
+        description: error.message || "Please check your code and try again",
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -64,74 +95,92 @@ export default function Login() {
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
             <CardDescription>
-              Enter your credentials to access your dashboard
+              {sentEmail
+                ? "Enter the code we sent to your email"
+                : "Enter your email to receive a login code"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit((data) => loginMutation.mutate(data))}
-                className="space-y-4"
-              >
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="you@example.com"
-                          data-testid="input-email"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {!sentEmail ? (
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="you@example.com"
+                            data-testid="input-email"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          data-testid="input-password"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading}
+                    data-testid="button-login"
+                  >
+                    {isLoading ? "Sending code..." : "Send Login Code"}
+                  </Button>
+
+                  <p className="text-sm text-center text-muted-foreground">
+                    Don't have an account?{" "}
+                    <a
+                      href="/register"
+                      className="text-primary hover:underline"
+                      data-testid="link-register"
+                    >
+                      Register here
+                    </a>
+                  </p>
+                </form>
+              </Form>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Verification Code</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter 6-digit code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    maxLength={6}
+                    className="mt-2"
+                  />
+                </div>
 
                 <Button
-                  type="submit"
+                  onClick={verifyCode}
                   className="w-full"
-                  disabled={loginMutation.isPending}
-                  data-testid="button-login"
+                  disabled={isVerifying || code.length !== 6}
                 >
-                  {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                  {isVerifying ? "Verifying..." : "Verify Code"}
                 </Button>
 
-                <p className="text-sm text-center text-muted-foreground">
-                  Don't have an account?{" "}
-                  <a
-                    href="/register"
-                    className="text-primary hover:underline"
-                    data-testid="link-register"
-                  >
-                    Register here
-                  </a>
-                </p>
-              </form>
-            </Form>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSentEmail(false);
+                    setCode("");
+                  }}
+                  className="w-full"
+                >
+                  Use different email
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

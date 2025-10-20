@@ -1,8 +1,8 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema, type RegisterInput } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { z } from "zod";
+import { db } from "@/lib/instant";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,42 +17,101 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { MessageSquare } from "lucide-react";
+import { id } from "@instantdb/react";
+
+const registerSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  organizationName: z.string().min(1, "Organization name is required"),
+});
+
+type RegisterInput = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [sentEmail, setSentEmail] = useState(false);
+  const [formData, setFormData] = useState<RegisterInput | null>(null);
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: "",
       email: "",
-      password: "",
       organizationName: "",
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterInput) => {
-      const res = await apiRequest("POST", "/api/auth/register", data);
-      return res;
-    },
-    onSuccess: (data) => {
-      localStorage.setItem("authToken", data.token);
+  const onSubmit = async (data: RegisterInput) => {
+    setIsLoading(true);
+    setFormData(data);
+    try {
+      await db.auth.sendMagicCode({ email: data.email });
+      setSentEmail(true);
       toast({
-        title: "Registration successful",
-        description: "Welcome! You can now access your dashboard.",
+        title: "Check your email",
+        description: `We sent a verification code to ${data.email}`,
       });
-      setLocation("/");
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
-        title: "Registration failed",
-        description: error.message,
+        title: "Error",
+        description: error.message || "Failed to send verification code",
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const [code, setCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const verifyCode = async () => {
+    if (!formData) return;
+
+    setIsVerifying(true);
+    try {
+      // Sign in with magic code
+      await db.auth.signInWithMagicCode({
+        email: formData.email,
+        code
+      });
+
+      // Create organization and link user
+      const organizationId = id();
+
+      await db.transact([
+        db.tx.organizations[organizationId].update({
+          name: formData.organizationName,
+        }),
+      ]);
+
+      // Get current user and link to organization
+      const { user } = db.useAuth();
+      if (user) {
+        await db.transact([
+          db.tx.$users[user.id].link({
+            organization: organizationId
+          })
+        ]);
+      }
+
+      toast({
+        title: "Account created",
+        description: "Welcome! Your organization has been set up.",
+      });
+      setLocation("/");
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: error.message || "Please check your code and try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -66,110 +125,129 @@ export default function Register() {
           <CardHeader>
             <CardTitle>Create Account</CardTitle>
             <CardDescription>
-              Register as a super administrator to manage your organization
+              {sentEmail
+                ? "Enter the verification code we sent to your email"
+                : "Register as a super administrator to manage your organization"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit((data) => registerMutation.mutate(data))}
-                className="space-y-4"
-              >
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="John Doe"
-                          data-testid="input-name"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {!sentEmail ? (
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="John Doe"
+                            data-testid="input-name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="you@example.com"
-                          data-testid="input-email"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="you@example.com"
+                            data-testid="input-email"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          data-testid="input-password"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="organizationName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Organization Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Acme Inc."
+                            data-testid="input-organization"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="organizationName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Organization Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Acme Inc."
-                          data-testid="input-organization"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading}
+                    data-testid="button-register"
+                  >
+                    {isLoading ? "Sending code..." : "Create Account"}
+                  </Button>
+
+                  <p className="text-sm text-center text-muted-foreground">
+                    Already have an account?{" "}
+                    <a
+                      href="/login"
+                      className="text-primary hover:underline"
+                      data-testid="link-login"
+                    >
+                      Sign in here
+                    </a>
+                  </p>
+                </form>
+              </Form>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Verification Code</label>
+                  <Input
+                    type="text"
+                    placeholder="Enter 6-digit code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    maxLength={6}
+                    className="mt-2"
+                  />
+                </div>
 
                 <Button
-                  type="submit"
+                  onClick={verifyCode}
                   className="w-full"
-                  disabled={registerMutation.isPending}
-                  data-testid="button-register"
+                  disabled={isVerifying || code.length !== 6}
                 >
-                  {registerMutation.isPending ? "Creating account..." : "Create Account"}
+                  {isVerifying ? "Creating account..." : "Verify & Create Account"}
                 </Button>
 
-                <p className="text-sm text-center text-muted-foreground">
-                  Already have an account?{" "}
-                  <a
-                    href="/login"
-                    className="text-primary hover:underline"
-                    data-testid="link-login"
-                  >
-                    Sign in here
-                  </a>
-                </p>
-              </form>
-            </Form>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSentEmail(false);
+                    setCode("");
+                    setFormData(null);
+                  }}
+                  className="w-full"
+                >
+                  Use different email
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
