@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,6 +33,11 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [sentEmail, setSentEmail] = useState(false);
   const [formData, setFormData] = useState<RegisterInput | null>(null);
+  const [code, setCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Get auth state
+  const { user, isLoading: authLoading } = db.useAuth();
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -42,6 +47,49 @@ export default function Register() {
       organizationName: "",
     },
   });
+
+  // When user logs in after verification, create organization
+  useEffect(() => {
+    const setupOrganization = async () => {
+      if (user && formData && isVerifying) {
+        try {
+          const organizationId = id();
+
+          // Create organization
+          await db.transact([
+            db.tx.organizations[organizationId].update({
+              name: formData.organizationName,
+            }),
+          ]);
+
+          // Link user to organization
+          await db.transact([
+            db.tx.$users[user.id].link({
+              organization: organizationId
+            })
+          ]);
+
+          toast({
+            title: "Account created",
+            description: "Welcome! Your organization has been set up.",
+          });
+
+          setIsVerifying(false);
+          setLocation("/");
+        } catch (error: any) {
+          console.error("Setup error:", error);
+          toast({
+            title: "Setup failed",
+            description: error.message || "Failed to set up organization",
+            variant: "destructive",
+          });
+          setIsVerifying(false);
+        }
+      }
+    };
+
+    setupOrganization();
+  }, [user, formData, isVerifying]);
 
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true);
@@ -64,52 +112,23 @@ export default function Register() {
     }
   };
 
-  const [code, setCode] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-
   const verifyCode = async () => {
     if (!formData) return;
 
     setIsVerifying(true);
     try {
-      // Sign in with magic code
+      // Sign in with magic code - this will trigger the useEffect above
       await db.auth.signInWithMagicCode({
         email: formData.email,
         code
       });
-
-      // Create organization and link user
-      const organizationId = id();
-
-      await db.transact([
-        db.tx.organizations[organizationId].update({
-          name: formData.organizationName,
-        }),
-      ]);
-
-      // Get current user and link to organization
-      const { user } = db.useAuth();
-      if (user) {
-        await db.transact([
-          db.tx.$users[user.id].link({
-            organization: organizationId
-          })
-        ]);
-      }
-
-      toast({
-        title: "Account created",
-        description: "Welcome! Your organization has been set up.",
-      });
-      setLocation("/");
     } catch (error: any) {
+      setIsVerifying(false);
       toast({
-        title: "Verification failed",
+        title: "Invalid code",
         description: error.message || "Please check your code and try again",
         variant: "destructive",
       });
-    } finally {
-      setIsVerifying(false);
     }
   };
 
