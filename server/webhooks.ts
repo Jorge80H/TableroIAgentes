@@ -1,15 +1,22 @@
 // Webhook endpoint for n8n to send WhatsApp messages to InstantDB
 import type { Express } from "express";
-import { init } from "@instantdb/admin";
 
 const APP_ID = process.env.VITE_INSTANT_APP_ID || 'c089e2f5-a75d-427f-be1d-b059c6a0263d';
 const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
 
-if (!ADMIN_TOKEN) {
-  console.warn("⚠️ INSTANT_ADMIN_TOKEN not set - webhook endpoint will not work");
-}
+// Lazy load InstantDB admin only when needed
+let db: any = null;
 
-const db = init({ appId: APP_ID, adminToken: ADMIN_TOKEN });
+async function getDB() {
+  if (!db) {
+    if (!ADMIN_TOKEN) {
+      throw new Error("INSTANT_ADMIN_TOKEN not set");
+    }
+    const { init } = await import("@instantdb/admin");
+    db = init({ appId: APP_ID, adminToken: ADMIN_TOKEN });
+  }
+  return db;
+}
 
 export function registerWebhooks(app: Express) {
   /**
@@ -37,6 +44,8 @@ export function registerWebhooks(app: Express) {
         });
         return;
       }
+
+      const db = await getDB();
 
       // Verify agent exists and API token matches
       const { data: agentData } = await db.query({
@@ -146,6 +155,8 @@ export function registerWebhooks(app: Express) {
         });
         return;
       }
+
+      const db = await getDB();
 
       // Get agent with webhook URL
       const { data: agentData } = await db.query({
