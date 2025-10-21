@@ -44,22 +44,26 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     const db = await getDB();
 
     // Verify agent exists and API token matches
+    console.log("Looking for agent with ID:", agentId);
+
     const { data: agentData } = await db.query({
-      agents: {
-        $: {
-          where: {
-            id: agentId
-          }
-        }
-      }
+      agents: {}
     });
 
-    const agent = agentData?.agents?.[0];
+    console.log("All agents in DB:", JSON.stringify(agentData));
+
+    const agent = agentData?.agents?.find((a: any) => a.id === agentId);
 
     if (!agent) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: "Agent not found" }),
+        body: JSON.stringify({
+          error: "Agent not found",
+          debug: {
+            searchingFor: agentId,
+            foundAgents: agentData?.agents?.map((a: any) => a.id) || []
+          }
+        }),
       };
     }
 
