@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { Conversation, Message } from "@shared/schema";
+import { db } from "@/lib/instant";
 import { ConversationList } from "@/components/conversation-list";
 import { ChatView } from "@/components/chat-view";
 import { MessageSquare } from "lucide-react";
@@ -8,11 +7,15 @@ import { MessageSquare } from "lucide-react";
 export default function Conversations() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
-  const { data: conversations, isLoading } = useQuery<Conversation[]>({
-    queryKey: ["/api/conversations"],
+  const { isLoading, data } = db.useQuery({
+    conversations: {
+      messages: {},
+      agent: {}
+    }
   });
 
-  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+  const conversations = data?.conversations || [];
+  const selectedConversation = conversations?.find((c: any) => c.id === selectedConversationId);
 
   if (isLoading) {
     return (

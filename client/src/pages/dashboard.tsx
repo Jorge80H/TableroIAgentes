@@ -1,21 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
-import type { Agent, Conversation } from "@shared/schema";
+import { db } from "@/lib/instant";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, MessageSquare, UserCheck, BotIcon } from "lucide-react";
 
 export default function Dashboard() {
-  const { data: agents } = useQuery<Agent[]>({
-    queryKey: ["/api/agents"],
-  });
+  const { data: agentsData } = db.useQuery({ agents: {} });
+  const { data: conversationsData } = db.useQuery({ conversations: {} });
 
-  const { data: conversations } = useQuery<Conversation[]>({
-    queryKey: ["/api/conversations"],
-  });
+  const agents = agentsData?.agents || [];
+  const conversations = conversationsData?.conversations || [];
 
-  const activeAgents = agents?.filter((a) => a.isActive === "true").length || 0;
+  const activeAgents = agents?.filter((a: any) => a.isActive).length || 0;
   const totalConversations = conversations?.length || 0;
-  const aiActiveCount = conversations?.filter((c) => c.status === "AI_ACTIVE").length || 0;
-  const humanActiveCount = conversations?.filter((c) => c.status === "HUMAN_ACTIVE").length || 0;
+  const aiActiveCount = conversations?.filter((c: any) => c.status === "AI_ACTIVE").length || 0;
+  const humanActiveCount = conversations?.filter((c: any) => c.status === "HUMAN_ACTIVE").length || 0;
 
   const stats = [
     {
@@ -150,12 +147,12 @@ export default function Dashboard() {
                     </div>
                     <span
                       className={`text-xs px-2 py-1 rounded flex-shrink-0 ${
-                        agent.isActive === "true"
+                        agent.isActive
                           ? "bg-green-600/10 text-green-700 dark:text-green-400"
                           : "bg-gray-600/10 text-gray-700 dark:text-gray-400"
                       }`}
                     >
-                      {agent.isActive === "true" ? "Active" : "Inactive"}
+                      {agent.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
                 ))}
