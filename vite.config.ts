@@ -30,6 +30,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      external: [
+        '@instantdb/admin',
+        'express',
+        'ws',
+        'http',
+        'crypto'
+      ]
+    }
   },
   server: {
     fs: {
