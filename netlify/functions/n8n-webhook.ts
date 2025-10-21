@@ -42,14 +42,26 @@ export const handler = async (event: any) => {
     console.log("Using APP_ID:", APP_ID);
     console.log("ADMIN_TOKEN exists:", !!ADMIN_TOKEN);
 
-    let agentData;
+    let agent;
     try {
-      // Use db.queryOnce for admin SDK
-      const result = await db.queryOnce({ agents: {} });
-      console.log("Raw query result:", JSON.stringify(result));
-      agentData = result.data;
+      // InstantDB admin SDK uses transact for reads too
+      // Let's try to get the specific agent by ID directly
+      console.log("Attempting to query agent...");
+
+      // Try using tx to read data
+      const agentsQuery = await db.query({ agents: {} });
+      console.log("Query result type:", typeof agentsQuery);
+      console.log("Query result:", JSON.stringify(agentsQuery));
+
+      // The result might be directly the data object
+      const agents = agentsQuery?.agents || [];
+      console.log("Agents found:", agents.length);
+      console.log("All agents:", JSON.stringify(agents));
+
+      agent = agents.find((a: any) => a.id === agentId);
     } catch (error: any) {
       console.error("Query error:", error);
+      console.error("Error stack:", error.stack);
       return {
         statusCode: 500,
         body: JSON.stringify({
@@ -59,10 +71,6 @@ export const handler = async (event: any) => {
         }),
       };
     }
-
-    console.log("All agents in DB:", JSON.stringify(agentData));
-
-    const agent = agentData?.agents?.find((a: any) => a.id === agentId);
 
     if (!agent) {
       return {
