@@ -1,8 +1,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertAgentSchema, type InsertAgent } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { z } from "zod";
+import { db } from "@/lib/instant";
+import { id } from "@instantdb/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,47 +21,69 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+
+const createAgentSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  webhookUrl: z.string().url("Must be a valid URL"),
+  apiToken: z.string().min(1, "API token is required"),
+  isActive: z.boolean().default(true),
+});
 
 interface CreateAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+type CreateAgentInput = z.infer<typeof createAgentSchema>;
+
 export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps) {
   const { toast } = useToast();
+  const [isCreating, setIsCreating] = useState(false);
 
-  const form = useForm<InsertAgent>({
-    resolver: zodResolver(insertAgentSchema),
+  const form = useForm<CreateAgentInput>({
+    resolver: zodResolver(createAgentSchema),
     defaultValues: {
       name: "",
       webhookUrl: "",
       apiToken: "",
-      organizationId: "",
+      isActive: true,
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: InsertAgent) => {
-      return await apiRequest("POST", "/api/agents", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
+  const onSubmit = async (data: CreateAgentInput) => {
+    setIsCreating(true);
+    try {
+      const agentId = id();
+
+      await db.transact([
+        db.tx.agents[agentId].update({
+          name: data.name,
+          webhookUrl: data.webhookUrl,
+          apiToken: data.apiToken,
+          isActive: data.isActive,
+        }),
+      ]);
+
       toast({
         title: "Agent created",
         description: "Your new agent has been created successfully.",
       });
       form.reset();
       onOpenChange(false);
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
+      console.error("Create agent error:", error);
       toast({
         title: "Creation failed",
-        description: error.message,
+        description: error.message || "Failed to create agent",
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,7 +97,7 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit((data) => createMutation.mutate(data))}
+            onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-4"
           >
             <FormField
@@ -156,11 +178,11 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
               </Button>
               <Button
                 type="submit"
-                disabled={createMutation.isPending}
+                disabled={isCreating}
                 className="flex-1"
                 data-testid="button-submit-create"
               >
-                {createMutation.isPending ? "Creating..." : "Create Agent"}
+                {isCreating ? "Creating..." : "Create Agent"}
               </Button>
             </div>
           </form>

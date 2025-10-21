@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Agent } from "@shared/schema";
+import { db } from "@/lib/instant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Bot, Trash2, Edit } from "lucide-react";
@@ -20,36 +18,48 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+type Agent = {
+  id: string;
+  name: string;
+  webhookUrl: string;
+  apiToken: string;
+  isActive: boolean;
+};
+
 export default function Agents() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [deletingAgent, setDeletingAgent] = useState<Agent | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { data: agents, isLoading } = useQuery<Agent[]>({
-    queryKey: ["/api/agents"],
-  });
+  // Query agents from InstantDB
+  const { isLoading, error, data } = db.useQuery({ agents: {} });
+  const agents = data?.agents || [];
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/agents/${id}`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      await db.transact([
+        db.tx.agents[id].delete(),
+      ]);
+
       toast({
         title: "Agent deleted",
         description: "The agent has been removed successfully.",
       });
       setDeletingAgent(null);
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
+      console.error("Delete agent error:", error);
       toast({
         title: "Delete failed",
-        description: error.message,
+        description: error.message || "Failed to delete agent",
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -106,8 +116,8 @@ export default function Agents() {
                       {agent.name}
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      <Badge variant={agent.isActive === "true" ? "default" : "secondary"} data-testid={`badge-agent-status-${agent.id}`}>
-                        {agent.isActive === "true" ? "Active" : "Inactive"}
+                      <Badge variant={agent.isActive ? "default" : "secondary"} data-testid={`badge-agent-status-${agent.id}`}>
+                        {agent.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </CardDescription>
                   </div>
@@ -176,11 +186,12 @@ export default function Agents() {
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deletingAgent && deleteMutation.mutate(deletingAgent.id)}
+              onClick={() => deletingAgent && handleDelete(deletingAgent.id)}
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
