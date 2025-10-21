@@ -93,22 +93,29 @@ export const handler = async (event: any) => {
     }
 
     // Find existing conversation or create new one
-    const { data: conversationData } = await db.query({
+    console.log("Looking for existing conversation for phone:", clientPhone, "agent:", agentId);
+
+    const allConversations = await db.query({
       conversations: {
-        $: {
-          where: {
-            clientPhone: clientPhone,
-            "agent.id": agentId
-          }
-        }
+        agent: {}
       }
     });
 
+    console.log("All conversations:", JSON.stringify(allConversations));
+
+    // Filter manually since InstantDB admin SDK query might not support complex where clauses
+    const existingConversation = allConversations?.conversations?.find((c: any) =>
+      c.clientPhone === clientPhone && c.agent?.id === agentId
+    );
+
+    console.log("Existing conversation found:", !!existingConversation);
+
     let conversationId: string;
 
-    if (conversationData?.conversations?.[0]) {
+    if (existingConversation) {
       // Existing conversation
-      conversationId = conversationData.conversations[0].id;
+      conversationId = existingConversation.id;
+      console.log("Using existing conversation:", conversationId);
 
       // Update lastMessageAt
       await db.transact([
@@ -119,6 +126,7 @@ export const handler = async (event: any) => {
     } else {
       // Create new conversation
       conversationId = crypto.randomUUID();
+      console.log("Creating new conversation:", conversationId);
 
       await db.transact([
         db.tx.conversations[conversationId].update({
