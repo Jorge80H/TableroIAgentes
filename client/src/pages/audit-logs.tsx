@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import type { AuditLog } from "@shared/schema";
+import { db } from "@/lib/instant";
 import {
   Table,
   TableBody,
@@ -14,9 +13,8 @@ import { formatDistanceToNow } from "date-fns";
 import { ClipboardList } from "lucide-react";
 
 export default function AuditLogs() {
-  const { data: logs, isLoading } = useQuery<AuditLog[]>({
-    queryKey: ["/api/audit-logs"],
-  });
+  const { isLoading, data } = db.useQuery({ auditLogs: {} });
+  const logs = data?.auditLogs || [];
 
   const getActionBadge = (action: string) => {
     const variants: Record<string, string> = {
