@@ -79,7 +79,7 @@ export const handler = async (event: any) => {
           error: "Agent not found",
           debug: {
             searchingFor: agentId,
-            foundAgents: agentData?.agents?.map((a: any) => a.id) || []
+            foundAgents: agentsQuery?.agents?.map((a: any) => a.id) || []
           }
         }),
       };
@@ -101,14 +101,30 @@ export const handler = async (event: any) => {
       }
     });
 
-    console.log("All conversations:", JSON.stringify(allConversations));
+    console.log("All conversations count:", allConversations?.conversations?.length || 0);
+
+    // Log each conversation for debugging
+    allConversations?.conversations?.forEach((c: any, index: number) => {
+      console.log(`Conversation ${index}:`, {
+        id: c.id,
+        clientPhone: c.clientPhone,
+        agentId: c.agent?.id,
+        matches: c.clientPhone === clientPhone && c.agent?.id === agentId
+      });
+    });
 
     // Filter manually since InstantDB admin SDK query might not support complex where clauses
-    const existingConversation = allConversations?.conversations?.find((c: any) =>
-      c.clientPhone === clientPhone && c.agent?.id === agentId
-    );
+    const existingConversation = allConversations?.conversations?.find((c: any) => {
+      const phoneMatch = c.clientPhone === clientPhone;
+      const agentMatch = c.agent?.id === agentId;
+      console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${c.clientPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
+      return phoneMatch && agentMatch;
+    });
 
     console.log("Existing conversation found:", !!existingConversation);
+    if (existingConversation) {
+      console.log("Matched conversation ID:", existingConversation.id);
+    }
 
     let conversationId: string;
 
