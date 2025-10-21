@@ -2,7 +2,7 @@ import { useState } from "react";
 import { db } from "@/lib/instant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Bot, Trash2, Edit } from "lucide-react";
+import { Plus, Bot, Trash2, Edit, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CreateAgentDialog } from "@/components/create-agent-dialog";
 import { EditAgentDialog } from "@/components/edit-agent-dialog";
@@ -32,6 +32,17 @@ export default function Agents() {
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [deletingAgent, setDeletingAgent] = useState<Agent | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast({
+      title: "Copied to clipboard",
+      description: "Agent ID copied successfully",
+    });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Query agents from InstantDB
   const { isLoading, error, data } = db.useQuery({ agents: {} });
@@ -125,6 +136,26 @@ export default function Agents() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-muted-foreground">Agent ID</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2"
+                      onClick={() => copyToClipboard(agent.id, agent.id)}
+                    >
+                      {copiedId === agent.id ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-sm font-mono truncate" data-testid={`text-agent-id-${agent.id}`}>
+                    {agent.id}
+                  </p>
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Webhook URL</p>
                   <p className="text-sm font-mono truncate" data-testid={`text-webhook-url-${agent.id}`}>
