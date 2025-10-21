@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Conversation, Message } from "@shared/schema";
+import { db } from "@/lib/instant";
+import type { Message } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
 interface ChatViewProps {
-  conversation: Conversation | undefined;
+  conversation: any;
 }
 
 export function ChatView({ conversation }: ChatViewProps) {
@@ -18,70 +17,70 @@ export function ChatView({ conversation }: ChatViewProps) {
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: messages } = useQuery<Message[]>({
-    queryKey: ["/api/conversations", conversation?.id, "messages"],
-    enabled: !!conversation,
-  });
+  const messages = conversation?.messages || [];
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      return await apiRequest("POST", `/api/conversations/${conversation!.id}/messages`, {
-        content,
-        senderType: "HUMAN",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversation!.id, "messages"] });
+  const sendMessage = async (content: string) => {
+    try {
+      const messageId = crypto.randomUUID();
+      await db.transact([
+        db.tx.messages[messageId].update({
+          senderType: "HUMAN",
+          content,
+          senderName: "Human Agent"
+        }),
+        db.tx.messages[messageId].link({
+          conversation: conversation.id
+        })
+      ]);
       setMessageText("");
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
         title: "Failed to send message",
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
+    }
+  };
 
-  const takeControlMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("POST", `/api/conversations/${conversation!.id}/take-control`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+  const takeControl = async () => {
+    try {
+      await db.transact([
+        db.tx.conversations[conversation.id].update({
+          status: "HUMAN_ACTIVE"
+        })
+      ]);
       toast({
         title: "Control taken",
         description: "You are now handling this conversation",
       });
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
         title: "Failed to take control",
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
+    }
+  };
 
-  const returnToAIMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("POST", `/api/conversations/${conversation!.id}/return-to-ai`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+  const returnToAI = async () => {
+    try {
+      await db.transact([
+        db.tx.conversations[conversation.id].update({
+          status: "AI_ACTIVE"
+        })
+      ]);
       toast({
         title: "Returned to AI",
         description: "The AI agent is now handling this conversation",
       });
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
         title: "Failed to return to AI",
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -140,8 +139,7 @@ export function ChatView({ conversation }: ChatViewProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => returnToAIMutation.mutate()}
-                  disabled={returnToAIMutation.isPending}
+                  onClick={returnToAI}
                   data-testid="button-return-to-ai"
                 >
                   <BotIcon className="h-4 w-4 mr-2" />
@@ -157,8 +155,7 @@ export function ChatView({ conversation }: ChatViewProps) {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => takeControlMutation.mutate()}
-                  disabled={takeControlMutation.isPending}
+                  onClick={takeControl}
                   data-testid="button-take-control"
                 >
                   <UserCheck className="h-4 w-4 mr-2" />
@@ -212,8 +209,8 @@ export function ChatView({ conversation }: ChatViewProps) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (messageText.trim() && !sendMessageMutation.isPending) {
-              sendMessageMutation.mutate(messageText);
+            if (messageText.trim()) {
+              sendMessage(messageText);
             }
           }}
           className="flex gap-2"
@@ -226,13 +223,13 @@ export function ChatView({ conversation }: ChatViewProps) {
                 ? "Type your message..."
                 : "Take control to send messages"
             }
-            disabled={!isHumanActive || sendMessageMutation.isPending}
+            disabled={!isHumanActive}
             data-testid="input-message"
             className="flex-1"
           />
           <Button
             type="submit"
-            disabled={!isHumanActive || !messageText.trim() || sendMessageMutation.isPending}
+            disabled={!isHumanActive || !messageText.trim()}
             data-testid="button-send-message"
           >
             <Send className="h-4 w-4" />
