@@ -1,8 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAgentSchema, type InsertAgent, type Agent } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { db } from "@/lib/instant";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,26 +51,28 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
     });
   }, [agent, form]);
 
-  const updateMutation = useMutation({
-    mutationFn: async (data: InsertAgent) => {
-      return await apiRequest("PUT", `/api/agents/${agent.id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
+  const updateAgent = async (data: InsertAgent) => {
+    try {
+      await db.transact([
+        db.tx.agents[agent.id].update({
+          name: data.name,
+          webhookUrl: data.webhookUrl,
+          apiToken: data.apiToken
+        })
+      ]);
       toast({
         title: "Agent updated",
         description: "Your agent has been updated successfully.",
       });
       onOpenChange(false);
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
         title: "Update failed",
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,7 +86,7 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))}
+            onSubmit={form.handleSubmit(updateAgent)}
             className="space-y-4"
           >
             <FormField
@@ -166,11 +167,10 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
               </Button>
               <Button
                 type="submit"
-                disabled={updateMutation.isPending}
                 className="flex-1"
                 data-testid="button-submit-edit"
               >
-                {updateMutation.isPending ? "Updating..." : "Update Agent"}
+                Update Agent
               </Button>
             </div>
           </form>
