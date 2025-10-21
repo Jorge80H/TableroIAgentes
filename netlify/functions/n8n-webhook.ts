@@ -1,23 +1,19 @@
-import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import { init } from "@instantdb/admin";
 
 const APP_ID = process.env.VITE_INSTANT_APP_ID || 'c089e2f5-a75d-427f-be1d-b059c6a0263d';
 const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
 
-// Lazy load InstantDB admin
-let db: any = null;
-
-async function getDB() {
-  if (!db) {
-    if (!ADMIN_TOKEN) {
-      throw new Error("INSTANT_ADMIN_TOKEN not set");
-    }
-    const { init } = await import("@instantdb/admin");
-    db = init({ appId: APP_ID, adminToken: ADMIN_TOKEN });
-  }
-  return db;
+if (!ADMIN_TOKEN) {
+  console.error("INSTANT_ADMIN_TOKEN is not set!");
 }
 
-export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+// Initialize InstantDB
+const db = init({
+  appId: APP_ID,
+  adminToken: ADMIN_TOKEN || ''
+});
+
+export const handler = async (event: any) => {
   // Only allow POST requests
   if (event.httpMethod !== "POST") {
     return {
@@ -41,15 +37,16 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
 
-    const db = await getDB();
-
     // Verify agent exists and API token matches
     console.log("Looking for agent with ID:", agentId);
+    console.log("Using APP_ID:", APP_ID);
+    console.log("ADMIN_TOKEN exists:", !!ADMIN_TOKEN);
 
-    const { data: agentData } = await db.query({
+    const { data: agentData, error: queryError } = await db.query({
       agents: {}
     });
 
+    console.log("Query error:", queryError);
     console.log("All agents in DB:", JSON.stringify(agentData));
 
     const agent = agentData?.agents?.find((a: any) => a.id === agentId);
