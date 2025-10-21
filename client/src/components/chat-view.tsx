@@ -17,21 +17,7 @@ export function ChatView({ conversation }: ChatViewProps) {
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  if (!conversation) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-background">
-        <div className="text-center">
-          <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">No conversation selected</h3>
-          <p className="text-sm text-muted-foreground">
-            Choose a conversation from the list to start chatting
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const messages = conversation.messages || [];
+  const messages = conversation?.messages || [];
 
   const sendMessage = async (content: string) => {
     if (!conversation?.id) return;
@@ -105,6 +91,20 @@ export function ChatView({ conversation }: ChatViewProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  if (!conversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <div className="text-center">
+          <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">No conversation selected</h3>
+          <p className="text-sm text-muted-foreground">
+            Choose a conversation from the list to start chatting
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const isHumanActive = conversation.status === "HUMAN_ACTIVE";
 
