@@ -42,11 +42,24 @@ export const handler = async (event: any) => {
     console.log("Using APP_ID:", APP_ID);
     console.log("ADMIN_TOKEN exists:", !!ADMIN_TOKEN);
 
-    const { data: agentData, error: queryError } = await db.query({
-      agents: {}
-    });
+    let agentData;
+    try {
+      // Use db.queryOnce for admin SDK
+      const result = await db.queryOnce({ agents: {} });
+      console.log("Raw query result:", JSON.stringify(result));
+      agentData = result.data;
+    } catch (error: any) {
+      console.error("Query error:", error);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "Database query failed",
+          message: error.message,
+          stack: error.stack
+        }),
+      };
+    }
 
-    console.log("Query error:", queryError);
     console.log("All agents in DB:", JSON.stringify(agentData));
 
     const agent = agentData?.agents?.find((a: any) => a.id === agentId);
