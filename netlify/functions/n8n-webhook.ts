@@ -24,7 +24,15 @@ export const handler = async (event: any) => {
 
   try {
     const body = JSON.parse(event.body || "{}");
-    const { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = body;
+    let { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = body;
+
+    // Normalize clientPhone - remove leading '=' if present (from n8n expressions)
+    if (clientPhone && clientPhone.startsWith('=')) {
+      clientPhone = clientPhone.substring(1);
+    }
+    if (clientName && clientName.startsWith('=')) {
+      clientName = clientName.substring(1);
+    }
 
     // Validate required fields
     if (!agentId || !apiToken || !clientPhone || !message) {
@@ -115,9 +123,11 @@ export const handler = async (event: any) => {
 
     // Filter manually since InstantDB admin SDK query might not support complex where clauses
     const existingConversation = allConversations?.conversations?.find((c: any) => {
-      const phoneMatch = c.clientPhone === clientPhone;
+      // Normalize the stored phone number too
+      const storedPhone = c.clientPhone?.startsWith('=') ? c.clientPhone.substring(1) : c.clientPhone;
+      const phoneMatch = storedPhone === clientPhone;
       const agentMatch = c.agent?.id === agentId;
-      console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${c.clientPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
+      console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${storedPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
       return phoneMatch && agentMatch;
     });
 
