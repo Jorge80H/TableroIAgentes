@@ -20,9 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { User } from "@shared/schema";
+import { db } from "@/lib/instant";
 
 const menuItems = [
   {
@@ -54,23 +52,16 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
+  const { user } = db.useAuth();
 
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/me"],
-  });
+  const logout = () => {
+    db.auth.signOut();
+    setLocation("/login");
+  };
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout", {});
-      localStorage.removeItem("authToken");
-      setLocation("/login");
-    },
-  });
-
-  const initials = user?.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
+  const initials = user?.email
+    ?.split("@")[0]
+    .substring(0, 2)
     .toUpperCase() || "U";
 
   return (
@@ -104,7 +95,7 @@ export function AppSidebar() {
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate" data-testid="text-user-name">
-              {user?.name || "User"}
+              {user?.email?.split("@")[0] || "User"}
             </p>
             <p className="text-xs text-muted-foreground truncate" data-testid="text-user-email">
               {user?.email || ""}
@@ -113,7 +104,7 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => logoutMutation.mutate()}
+            onClick={logout}
             data-testid="button-logout"
           >
             <LogOut className="h-4 w-4" />
