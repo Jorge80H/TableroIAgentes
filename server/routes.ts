@@ -17,6 +17,30 @@ import {
   insertMessageSchema,
 } from "@shared/schema";
 
+/**
+ * Normalizes phone numbers to a consistent format for comparison and storage.
+ * Removes all non-numeric characters except the leading '+' for international numbers.
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+
+  // Remove leading '=' from n8n expressions
+  let normalized = phone.startsWith('=') ? phone.substring(1) : phone;
+
+  // Check if number has international prefix
+  const hasInternationalPrefix = normalized.trim().startsWith('+');
+
+  // Remove all non-numeric characters
+  normalized = normalized.replace(/\D/g, '');
+
+  // Add back the '+' if it was present
+  if (hasInternationalPrefix && !normalized.startsWith('+')) {
+    normalized = '+' + normalized;
+  }
+
+  return normalized;
+}
+
 // Store active WebSocket connections by user ID with organization info
 interface SocketConnection {
   socket: WebSocket;
@@ -348,11 +372,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Webhook endpoint for n8n to send messages
   app.post("/api/webhooks/messages", async (req, res) => {
     try {
-      const { agentId, clientPhone, clientName, message, apiToken } = req.body;
+      let { agentId, clientPhone, clientName, message, apiToken } = req.body;
 
       if (!agentId || !apiToken) {
         res.status(400).json({ error: "Missing required fields" });
         return;
+      }
+
+      // Normalize phone number
+      if (clientPhone) {
+        clientPhone = normalizePhoneNumber(clientPhone);
       }
 
       const agent = await storage.getAgent(agentId);
@@ -361,10 +390,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Find or create conversation
+      // Find or create conversation - normalize phone numbers for comparison
       const existingConversations = await storage.getConversations(agent.organizationId);
       let conversation = existingConversations.find(
-        (c) => c.clientPhone === clientPhone && c.agentId === agentId
+        (c) => normalizePhoneNumber(c.clientPhone) === clientPhone && c.agentId === agentId
       );
 
       if (!conversation) {

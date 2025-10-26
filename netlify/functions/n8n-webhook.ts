@@ -13,6 +13,36 @@ const db = init({
   adminToken: ADMIN_TOKEN || ''
 });
 
+/**
+ * Normalizes phone numbers to a consistent format for comparison and storage.
+ * Removes all non-numeric characters except the leading '+' for international numbers.
+ *
+ * Examples:
+ * - "+1 (234) 567-8900" -> "+12345678900"
+ * - "234-567-8900" -> "2345678900"
+ * - "=+1234567890" -> "+1234567890"
+ * - "(234) 567 8900" -> "2345678900"
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+
+  // Remove leading '=' from n8n expressions
+  let normalized = phone.startsWith('=') ? phone.substring(1) : phone;
+
+  // Check if number has international prefix
+  const hasInternationalPrefix = normalized.trim().startsWith('+');
+
+  // Remove all non-numeric characters
+  normalized = normalized.replace(/\D/g, '');
+
+  // Add back the '+' if it was present
+  if (hasInternationalPrefix && !normalized.startsWith('+')) {
+    normalized = '+' + normalized;
+  }
+
+  return normalized;
+}
+
 export const handler = async (event: any) => {
   // Only allow POST requests
   if (event.httpMethod !== "POST") {
@@ -26,10 +56,13 @@ export const handler = async (event: any) => {
     const body = JSON.parse(event.body || "{}");
     let { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = body;
 
-    // Normalize clientPhone - remove leading '=' if present (from n8n expressions)
-    if (clientPhone && clientPhone.startsWith('=')) {
-      clientPhone = clientPhone.substring(1);
+    // Normalize clientPhone to consistent format
+    if (clientPhone) {
+      clientPhone = normalizePhoneNumber(clientPhone);
+      console.log("Normalized client phone:", clientPhone);
     }
+
+    // Remove leading '=' from clientName if present (from n8n expressions)
     if (clientName && clientName.startsWith('=')) {
       clientName = clientName.substring(1);
     }
@@ -51,13 +84,14 @@ export const handler = async (event: any) => {
     console.log("ADMIN_TOKEN exists:", !!ADMIN_TOKEN);
 
     let agent;
+    let agentsQuery;
     try {
       // InstantDB admin SDK uses transact for reads too
       // Let's try to get the specific agent by ID directly
       console.log("Attempting to query agent...");
 
       // Try using tx to read data
-      const agentsQuery = await db.query({ agents: {} });
+      agentsQuery = await db.query({ agents: {} });
       console.log("Query result type:", typeof agentsQuery);
       console.log("Query result:", JSON.stringify(agentsQuery));
 
@@ -113,21 +147,25 @@ export const handler = async (event: any) => {
 
     // Log each conversation for debugging
     allConversations?.conversations?.forEach((c: any, index: number) => {
+      const storedPhoneNormalized = normalizePhoneNumber(c.clientPhone || '');
+      const clientPhoneNormalized = normalizePhoneNumber(clientPhone);
       console.log(`Conversation ${index}:`, {
         id: c.id,
         clientPhone: c.clientPhone,
+        clientPhoneNormalized: storedPhoneNormalized,
         agentId: c.agent?.id,
-        matches: c.clientPhone === clientPhone && c.agent?.id === agentId
+        matches: storedPhoneNormalized === clientPhoneNormalized && c.agent?.id === agentId
       });
     });
 
     // Filter manually since InstantDB admin SDK query might not support complex where clauses
     const existingConversation = allConversations?.conversations?.find((c: any) => {
-      // Normalize the stored phone number too
-      const storedPhone = c.clientPhone?.startsWith('=') ? c.clientPhone.substring(1) : c.clientPhone;
-      const phoneMatch = storedPhone === clientPhone;
+      // Normalize the stored phone number for comparison
+      const storedPhone = normalizePhoneNumber(c.clientPhone || '');
+      const normalizedClientPhone = normalizePhoneNumber(clientPhone);
+      const phoneMatch = storedPhone === normalizedClientPhone;
       const agentMatch = c.agent?.id === agentId;
-      console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${storedPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
+      console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${storedPhone} vs ${normalizedClientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
       return phoneMatch && agentMatch;
     });
 
