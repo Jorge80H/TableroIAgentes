@@ -7,6 +7,21 @@ if (!ADMIN_TOKEN) {
   console.error("INSTANT_ADMIN_TOKEN is not set!");
 }
 
+/**
+ * Normalize phone numbers to ensure consistent comparison
+ * - Remove leading '=' (from n8n expressions)
+ * - Remove spaces, hyphens, parentheses
+ * - Trim whitespace
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+
+  return phone
+    .trim()
+    .replace(/^=+/, '') // Remove leading '=' characters
+    .replace(/[\s\-\(\)]/g, ''); // Remove spaces, hyphens, parentheses
+}
+
 // Initialize InstantDB
 const db = init({
   appId: APP_ID,
@@ -26,13 +41,21 @@ export const handler = async (event: any) => {
     const body = JSON.parse(event.body || "{}");
     let { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = body;
 
-    // Normalize clientPhone - remove leading '=' if present (from n8n expressions)
-    if (clientPhone && clientPhone.startsWith('=')) {
-      clientPhone = clientPhone.substring(1);
-    }
+    // Normalize phone number
+    clientPhone = normalizePhoneNumber(clientPhone);
+
+    // Normalize client name - remove leading '=' if present (from n8n expressions)
     if (clientName && clientName.startsWith('=')) {
       clientName = clientName.substring(1);
     }
+
+    // Log incoming message for debugging
+    console.log("📨 Incoming message:", {
+      senderType,
+      agentId: agentId?.substring(0, 8) + "...",
+      clientPhone: clientPhone?.substring(0, 8) + "...",
+      messagePreview: message?.substring(0, 50) + "..."
+    });
 
     // Validate required fields
     if (!agentId || !apiToken || !clientPhone || !message) {
@@ -123,8 +146,8 @@ export const handler = async (event: any) => {
 
     // Filter manually since InstantDB admin SDK query might not support complex where clauses
     const existingConversation = allConversations?.conversations?.find((c: any) => {
-      // Normalize the stored phone number too
-      const storedPhone = c.clientPhone?.startsWith('=') ? c.clientPhone.substring(1) : c.clientPhone;
+      // Normalize the stored phone number for comparison
+      const storedPhone = normalizePhoneNumber(c.clientPhone);
       const phoneMatch = storedPhone === clientPhone;
       const agentMatch = c.agent?.id === agentId;
       console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${storedPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
@@ -170,6 +193,13 @@ export const handler = async (event: any) => {
     // Create message
     const messageId = crypto.randomUUID();
 
+    console.log("✅ Creating message:", {
+      messageId: messageId.substring(0, 8) + "...",
+      conversationId: conversationId.substring(0, 8) + "...",
+      senderType,
+      senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+    });
+
     await db.transact([
       db.tx.messages[messageId].update({
         senderType,
@@ -181,12 +211,15 @@ export const handler = async (event: any) => {
       })
     ]);
 
+    console.log("💾 Message saved successfully");
+
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
         conversationId,
-        messageId
+        messageId,
+        senderType
       }),
     };
 

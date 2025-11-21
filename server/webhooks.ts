@@ -4,6 +4,21 @@ import type { Express } from "express";
 const APP_ID = process.env.VITE_INSTANT_APP_ID || 'c089e2f5-a75d-427f-be1d-b059c6a0263d';
 const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
 
+/**
+ * Normalize phone numbers to ensure consistent comparison
+ * - Remove leading '=' (from n8n expressions)
+ * - Remove spaces, hyphens, parentheses
+ * - Trim whitespace
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+
+  return phone
+    .trim()
+    .replace(/^=+/, '') // Remove leading '=' characters
+    .replace(/[\s\-\(\)]/g, ''); // Remove spaces, hyphens, parentheses
+}
+
 // Lazy load InstantDB admin only when needed
 let db: any = null;
 
@@ -34,7 +49,18 @@ export function registerWebhooks(app: Express) {
    */
   app.post("/api/webhooks/n8n/messages", async (req, res) => {
     try {
-      const { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = req.body;
+      let { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = req.body;
+
+      // Normalize phone number
+      clientPhone = normalizePhoneNumber(clientPhone);
+
+      // Log incoming message for debugging
+      console.log("📨 Incoming message:", {
+        senderType,
+        agentId: agentId?.substring(0, 8) + "...",
+        clientPhone: clientPhone?.substring(0, 8) + "...",
+        messagePreview: message?.substring(0, 50) + "..."
+      });
 
       // Validate required fields
       if (!agentId || !apiToken || !clientPhone || !message) {
@@ -71,22 +97,28 @@ export function registerWebhooks(app: Express) {
       }
 
       // Find existing conversation or create new one
+      // Note: We need to fetch all conversations for this agent and normalize phone numbers
+      // because InstantDB queries don't support transformation functions
       const { data: conversationData } = await db.query({
         conversations: {
           $: {
             where: {
-              clientPhone: clientPhone,
               "agent.id": agentId
             }
           }
         }
       });
 
+      // Find existing conversation with normalized phone number
+      const existingConversation = conversationData?.conversations?.find((c: any) =>
+        normalizePhoneNumber(c.clientPhone) === clientPhone
+      );
+
       let conversationId: string;
 
-      if (conversationData?.conversations?.[0]) {
+      if (existingConversation) {
         // Existing conversation
-        conversationId = conversationData.conversations[0].id;
+        conversationId = existingConversation.id;
 
         // Update lastMessageAt
         await db.transact([
@@ -114,6 +146,13 @@ export function registerWebhooks(app: Express) {
       // Create message
       const messageId = crypto.randomUUID();
 
+      console.log("✅ Creating message:", {
+        messageId: messageId.substring(0, 8) + "...",
+        conversationId: conversationId.substring(0, 8) + "...",
+        senderType,
+        senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+      });
+
       await db.transact([
         db.tx.messages[messageId].update({
           senderType,
@@ -125,10 +164,13 @@ export function registerWebhooks(app: Express) {
         })
       ]);
 
+      console.log("💾 Message saved successfully");
+
       res.json({
         success: true,
         conversationId,
-        messageId
+        messageId,
+        senderType
       });
 
     } catch (error: any) {

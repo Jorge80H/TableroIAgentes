@@ -4,7 +4,22 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Phone } from "lucide-react";
 import type { Conversation } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+
+/**
+ * Normalize phone numbers to ensure consistent comparison
+ * - Remove leading '=' (from n8n expressions)
+ * - Remove spaces, hyphens, parentheses
+ * - Trim whitespace
+ */
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+
+  return phone
+    .trim()
+    .replace(/^=+/, '') // Remove leading '=' characters
+    .replace(/[\s\-\(\)]/g, ''); // Remove spaces, hyphens, parentheses
+}
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -16,10 +31,29 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "AI_ACTIVE" | "HUMAN_ACTIVE">("all");
 
-  const filteredConversations = conversations.filter((conv) => {
+  // Deduplicate conversations by normalized phone number
+  // Keep the most recent conversation for each unique phone number
+  const deduplicatedConversations = useMemo(() => {
+    const conversationMap = new Map<string, Conversation>();
+
+    conversations.forEach((conv) => {
+      const normalizedPhone = normalizePhoneNumber(conv.clientPhone);
+      const existing = conversationMap.get(normalizedPhone);
+
+      // Keep the conversation with the most recent message
+      if (!existing || conv.lastMessageAt > existing.lastMessageAt) {
+        conversationMap.set(normalizedPhone, conv);
+      }
+    });
+
+    return Array.from(conversationMap.values());
+  }, [conversations]);
+
+  const filteredConversations = deduplicatedConversations.filter((conv) => {
+    const normalizedPhone = normalizePhoneNumber(conv.clientPhone);
     const matchesSearch =
       conv.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.clientPhone.includes(searchQuery);
+      normalizedPhone.includes(normalizePhoneNumber(searchQuery));
     const matchesStatus = statusFilter === "all" || conv.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
