@@ -49,6 +49,14 @@ export const handler = async (event: any) => {
       clientName = clientName.substring(1);
     }
 
+    // Log incoming message for debugging
+    console.log("📨 Incoming message:", {
+      senderType,
+      agentId: agentId?.substring(0, 8) + "...",
+      clientPhone: clientPhone?.substring(0, 8) + "...",
+      messagePreview: message?.substring(0, 50) + "..."
+    });
+
     // Validate required fields
     if (!agentId || !apiToken || !clientPhone || !message) {
       return {
@@ -185,6 +193,13 @@ export const handler = async (event: any) => {
     // Create message
     const messageId = crypto.randomUUID();
 
+    console.log("✅ Creating message:", {
+      messageId: messageId.substring(0, 8) + "...",
+      conversationId: conversationId.substring(0, 8) + "...",
+      senderType,
+      senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+    });
+
     await db.transact([
       db.tx.messages[messageId].update({
         senderType,
@@ -196,12 +211,15 @@ export const handler = async (event: any) => {
       })
     ]);
 
+    console.log("💾 Message saved successfully");
+
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
         conversationId,
-        messageId
+        messageId,
+        senderType
       }),
     };
 

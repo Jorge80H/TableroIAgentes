@@ -54,6 +54,14 @@ export function registerWebhooks(app: Express) {
       // Normalize phone number
       clientPhone = normalizePhoneNumber(clientPhone);
 
+      // Log incoming message for debugging
+      console.log("📨 Incoming message:", {
+        senderType,
+        agentId: agentId?.substring(0, 8) + "...",
+        clientPhone: clientPhone?.substring(0, 8) + "...",
+        messagePreview: message?.substring(0, 50) + "..."
+      });
+
       // Validate required fields
       if (!agentId || !apiToken || !clientPhone || !message) {
         res.status(400).json({
@@ -138,6 +146,13 @@ export function registerWebhooks(app: Express) {
       // Create message
       const messageId = crypto.randomUUID();
 
+      console.log("✅ Creating message:", {
+        messageId: messageId.substring(0, 8) + "...",
+        conversationId: conversationId.substring(0, 8) + "...",
+        senderType,
+        senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+      });
+
       await db.transact([
         db.tx.messages[messageId].update({
           senderType,
@@ -149,10 +164,13 @@ export function registerWebhooks(app: Express) {
         })
       ]);
 
+      console.log("💾 Message saved successfully");
+
       res.json({
         success: true,
         conversationId,
-        messageId
+        messageId,
+        senderType
       });
 
     } catch (error: any) {
