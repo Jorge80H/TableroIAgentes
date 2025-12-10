@@ -96,16 +96,103 @@ Dashboard → n8n Webhook → WhatsApp
 
 3. Connect: **AI Agent** → **Log AI Response** → **Send message**
 
-### Step 3: Handle Human Takeover
+### Step 3: Handle Human Takeover (Dashboard → WhatsApp)
 
-When a human agent takes control in the dashboard, messages will be sent to your n8n webhook URL. Update your workflow to handle this:
+When a human agent takes control in the dashboard and sends a message, it will be sent to your n8n webhook URL. You need to complete the webhook receptor workflow:
 
-1. Note your workflow's webhook URL (it should be something like):
-   ```
-   https://your-n8n-instance.com/webhook/b6bbaec2-3d36-4978-bf3a-973f17186ae7
-   ```
+#### Webhook Configuration
 
-2. This URL will be used when creating an agent in the dashboard
+Your webhook receptor should already exist in n8n. It will receive:
+
+**URL**: `https://n8n.srv942208.hstgr.cloud/webhook/iagenteCeluvendo`
+
+**Payload received from dashboard**:
+```json
+{
+  "conversationId": "uuid",
+  "clientPhone": "+573001234567",
+  "message": "Response from human agent",
+  "senderType": "HUMAN"
+}
+```
+
+#### Complete the Webhook Workflow
+
+After the Webhook node, add these nodes:
+
+**1. Function Node: "Extract Message Data"**
+```javascript
+// Extract data from webhook payload
+const conversationId = $input.item.json.conversationId;
+const clientPhone = $input.item.json.clientPhone;
+const message = $input.item.json.message;
+const senderType = $input.item.json.senderType;
+
+return {
+  json: {
+    conversationId,
+    clientPhone,
+    message,
+    senderType,
+    // Format for WhatsApp Business API
+    to: clientPhone,
+    text: {
+      body: message
+    }
+  }
+};
+```
+
+**2. HTTP Request Node: "Send to WhatsApp Business API"**
+
+Configure according to your WhatsApp Business API provider:
+
+**For WhatsApp Cloud API (Meta)**:
+- Method: POST
+- URL: `https://graph.facebook.com/v18.0/YOUR_PHONE_NUMBER_ID/messages`
+- Authentication: Header Auth
+- Header Name: `Authorization`
+- Header Value: `Bearer YOUR_ACCESS_TOKEN`
+- Body (JSON):
+```json
+{
+  "messaging_product": "whatsapp",
+  "to": "={{$json.clientPhone}}",
+  "type": "text",
+  "text": {
+    "body": "={{$json.message}}"
+  }
+}
+```
+
+**For Evolution API**:
+- Method: POST
+- URL: `https://your-evolution-api.com/message/sendText/YOUR_INSTANCE`
+- Authentication: Header Auth
+- Header Name: `apikey`
+- Header Value: `YOUR_API_KEY`
+- Body (JSON):
+```json
+{
+  "number": "={{$json.clientPhone}}",
+  "text": "={{$json.message}}"
+}
+```
+
+**For Twilio**:
+- Method: POST
+- URL: `https://api.twilio.com/2010-04-01/Accounts/YOUR_ACCOUNT_SID/Messages.json`
+- Authentication: Basic Auth
+- User: `YOUR_ACCOUNT_SID`
+- Password: `YOUR_AUTH_TOKEN`
+- Body (Form-UrlEncoded):
+  - `To`: `={{$json.clientPhone}}`
+  - `From`: `whatsapp:+14155238886` (your Twilio WhatsApp number)
+  - `Body`: `={{$json.message}}`
+
+**3. Optional: "Log Success" Node**
+
+Add a final HTTP Request to confirm the message was sent successfully back to the dashboard if needed.
 
 ## Dashboard Configuration
 
