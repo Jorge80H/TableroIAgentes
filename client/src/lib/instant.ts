@@ -8,6 +8,7 @@ type Schema = {
   organizations: {
     id: string;
     name: string;
+    createdAt?: number;
   };
   agents: {
     id: string;
@@ -15,6 +16,7 @@ type Schema = {
     webhookUrl: string;
     apiToken: string;
     isActive: boolean;
+    createdAt?: number;
   };
   conversations: {
     id: string;
@@ -22,17 +24,20 @@ type Schema = {
     clientName?: string;
     status: 'AI_ACTIVE' | 'HUMAN_ACTIVE' | 'ARCHIVED';
     lastMessageAt: number;
+    createdAt?: number;
   };
   messages: {
     id: string;
     senderType: 'AI' | 'HUMAN' | 'CLIENT';
     content: string;
     senderName?: string;
+    createdAt?: number;
   };
   auditLogs: {
     id: string;
     action: 'TAKE_CONTROL' | 'RETURN_TO_AI' | 'CREATE_AGENT' | 'DELETE_AGENT' | 'UPDATE_AGENT';
     details?: string;
+    createdAt?: number;
   };
 };
 

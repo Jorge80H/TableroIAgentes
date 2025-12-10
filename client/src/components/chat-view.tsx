@@ -24,6 +24,8 @@ export function ChatView({ conversation }: ChatViewProps) {
 
     try {
       const messageId = crypto.randomUUID();
+
+      // Add message to InstantDB
       await db.transact([
         db.tx.messages[messageId].update({
           senderType: "HUMAN",
@@ -32,8 +34,34 @@ export function ChatView({ conversation }: ChatViewProps) {
         }),
         db.tx.messages[messageId].link({
           conversation: conversation.id
+        }),
+        // Update lastMessageAt
+        db.tx.conversations[conversation.id].update({
+          lastMessageAt: Date.now()
         })
       ]);
+
+      // Send message to WhatsApp via n8n
+      if (conversation.agent && conversation.agent.length > 0) {
+        const agentId = conversation.agent[0].id;
+        try {
+          await fetch("/api/n8n/send-message", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              conversationId: conversation.id,
+              agentId: agentId,
+              message: content
+            })
+          });
+        } catch (webhookError) {
+          console.error("Failed to send to n8n:", webhookError);
+          // Don't block the UI if webhook fails
+        }
+      }
+
       setMessageText("");
     } catch (error: any) {
       toast({
