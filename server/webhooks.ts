@@ -49,6 +49,8 @@ export function registerWebhooks(app: Express) {
    */
   app.post("/api/webhooks/n8n/messages", async (req, res) => {
     try {
+      console.log("🚀 Webhook v2.0 - Using new conversation matching logic");
+
       let { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = req.body;
 
       // Log raw phone number before normalization
