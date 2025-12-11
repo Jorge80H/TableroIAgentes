@@ -20,6 +20,18 @@ export function ChatView({ conversation }: ChatViewProps) {
 
   const messages = conversation?.messages || [];
 
+  // Debug: log messages to console
+  console.log('Conversation messages:', {
+    conversationId: conversation?.id,
+    messageCount: messages.length,
+    messages: messages.map((m: any) => ({
+      id: m.id,
+      senderType: m.senderType,
+      content: m.content?.substring(0, 50),
+      createdAt: m.createdAt
+    }))
+  });
+
   const sendMessage = async (content: string) => {
     if (!conversation?.id) return;
 
@@ -45,8 +57,9 @@ export function ChatView({ conversation }: ChatViewProps) {
       // Send message to WhatsApp via n8n
       if (conversation.agent && conversation.agent.length > 0) {
         const agentId = conversation.agent[0].id;
+        console.log("Sending message to n8n:", { conversationId: conversation.id, agentId, message: content });
         try {
-          await fetch("/api/n8n/send-message", {
+          const response = await fetch("/api/n8n/send-message", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -57,10 +70,28 @@ export function ChatView({ conversation }: ChatViewProps) {
               message: content
             })
           });
+
+          const result = await response.json();
+          console.log("n8n response:", result);
+
+          if (!response.ok) {
+            console.error("n8n webhook failed:", result);
+            toast({
+              title: "Failed to send to WhatsApp",
+              description: result.error || "Unknown error",
+              variant: "destructive",
+            });
+          }
         } catch (webhookError) {
           console.error("Failed to send to n8n:", webhookError);
-          // Don't block the UI if webhook fails
+          toast({
+            title: "Network error",
+            description: "Could not connect to n8n",
+            variant: "destructive",
+          });
         }
+      } else {
+        console.warn("No agent configured for this conversation");
       }
 
       setMessageText("");
