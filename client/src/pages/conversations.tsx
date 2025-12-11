@@ -9,15 +9,20 @@ export default function Conversations() {
 
   const { isLoading, data } = db.useQuery({
     conversations: {
-      messages: {
-        $: {
-          order: {
-            serverCreatedAt: 'asc'
-          }
-        }
-      },
+      messages: {},
       agent: {}
     }
+  });
+
+  // Debug query results
+  console.log('Query results:', {
+    isLoading,
+    conversationsCount: data?.conversations?.length,
+    conversations: data?.conversations?.map((c: any) => ({
+      id: c.id,
+      messagesCount: c.messages?.length,
+      messages: c.messages
+    }))
   });
 
   const conversations = data?.conversations || [];
