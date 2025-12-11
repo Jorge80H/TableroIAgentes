@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "@/lib/instant";
 import type { Message } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,16 @@ export function ChatView({ conversation }: ChatViewProps) {
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const messages = conversation?.messages || [];
+  // Sort messages by creation time to ensure proper order
+  const messages = useMemo(() => {
+    const msgs = conversation?.messages || [];
+    // Sort by createdAt timestamp (oldest first)
+    return [...msgs].sort((a: any, b: any) => {
+      const timeA = a.createdAt || 0;
+      const timeB = b.createdAt || 0;
+      return timeA - timeB;
+    });
+  }, [conversation?.messages]);
 
   // Debug: log messages to console
   console.log('Conversation messages:', {

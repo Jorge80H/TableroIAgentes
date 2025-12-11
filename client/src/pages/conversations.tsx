@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { db } from "@/lib/instant";
 import { ConversationList } from "@/components/conversation-list";
 import { ChatView } from "@/components/chat-view";
@@ -18,19 +18,23 @@ export default function Conversations() {
     }
   });
 
-  // Debug query results
-  console.log('Query results:', {
-    isLoading,
-    conversationsCount: data?.conversations?.length,
-    conversations: data?.conversations?.map((c: any) => ({
-      id: c.id,
-      messagesCount: c.messages?.length,
-      messages: c.messages
-    }))
-  });
-
   const conversations = data?.conversations || [];
-  const selectedConversation = conversations?.find((c: any) => c.id === selectedConversationId);
+
+  // Use useMemo to stabilize the selected conversation object
+  const selectedConversation = useMemo(() => {
+    const conv = conversations?.find((c: any) => c.id === selectedConversationId);
+
+    // Debug: Log when selected conversation changes
+    if (conv && selectedConversationId) {
+      console.log('Selected conversation updated:', {
+        id: selectedConversationId.substring(0, 8),
+        messageCount: conv.messages?.length,
+        messageIds: conv.messages?.map((m: any) => m.id.substring(0, 8))
+      });
+    }
+
+    return conv;
+  }, [conversations, selectedConversationId]);
 
   if (isLoading) {
     return (
