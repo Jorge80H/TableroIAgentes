@@ -74,13 +74,14 @@ export const handler = async (event: any) => {
     console.log("ADMIN_TOKEN exists:", !!ADMIN_TOKEN);
 
     let agent;
+    let agentsQuery;
     try {
       // InstantDB admin SDK uses transact for reads too
       // Let's try to get the specific agent by ID directly
       console.log("Attempting to query agent...");
 
       // Try using tx to read data
-      const agentsQuery = await db.query({ agents: {} });
+      agentsQuery = await db.query({ agents: {} });
       console.log("Query result type:", typeof agentsQuery);
       console.log("Query result:", JSON.stringify(agentsQuery));
 
