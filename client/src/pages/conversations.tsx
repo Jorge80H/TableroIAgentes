@@ -9,7 +9,13 @@ export default function Conversations() {
 
   const { isLoading, data } = db.useQuery({
     conversations: {
-      messages: {},
+      messages: {
+        $: {
+          order: {
+            serverCreatedAt: 'asc'
+          }
+        }
+      },
       agent: {}
     }
   });

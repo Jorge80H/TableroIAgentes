@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Send, UserCheck, BotIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import ReactMarkdown from "react-markdown";
 
 interface ChatViewProps {
   conversation: any;
@@ -224,9 +225,9 @@ export function ChatView({ conversation }: ChatViewProps) {
                       {message.senderName}
                     </p>
                   )}
-                  <p className="text-sm" data-testid={`message-content-${message.id}`}>
-                    {message.content}
-                  </p>
+                  <div className="text-sm prose prose-sm dark:prose-invert max-w-none" data-testid={`message-content-${message.id}`}>
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
                 </div>
                 {message.createdAt && (
                   <p className="text-xs text-muted-foreground mt-1 px-1">
