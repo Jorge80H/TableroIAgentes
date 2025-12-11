@@ -194,6 +194,29 @@ export function registerWebhooks(app: Express) {
 
       console.log("💾 Message saved successfully");
 
+      // Verify the message was linked correctly
+      try {
+        const { data: verifyData } = await db.query({
+          conversations: {
+            $: {
+              where: {
+                id: conversationId
+              }
+            },
+            messages: {}
+          }
+        });
+
+        const conv = verifyData?.conversations?.[0];
+        console.log("✅ Verification after save:", {
+          conversationId: conversationId.substring(0, 8),
+          messagesInDB: conv?.messages?.length || 0,
+          messageIds: conv?.messages?.map((m: any) => m.id.substring(0, 8))
+        });
+      } catch (verifyError) {
+        console.error("⚠️  Verification failed:", verifyError);
+      }
+
       res.json({
         success: true,
         conversationId,
