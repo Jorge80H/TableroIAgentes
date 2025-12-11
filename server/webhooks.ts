@@ -123,16 +123,19 @@ export function registerWebhooks(app: Express) {
 
       // If not found, try to find any conversation with matching phone (to fix old conversations)
       if (!existingConversation) {
+        console.log("📞 No conversation with agent link found, searching by phone only...");
         existingConversation = conversationData?.conversations?.find((c: any) => {
           return normalizePhoneNumber(c.clientPhone) === clientPhone;
         });
 
         if (existingConversation) {
           console.log(`⚠️  Found conversation without agent link, will fix: ${existingConversation.id.substring(0, 8)}`);
+        } else {
+          console.log("❌ No existing conversation found at all");
         }
       }
 
-      console.log(`Existing conversation found: ${!!existingConversation}`);
+      console.log(`✅ Existing conversation found: ${!!existingConversation}`);
 
       let conversationId: string;
 
