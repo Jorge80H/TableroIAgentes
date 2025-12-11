@@ -146,18 +146,35 @@ export const handler = async (event: any) => {
     });
 
     // Filter manually since InstantDB admin SDK query might not support complex where clauses
-    const existingConversation = allConversations?.conversations?.find((c: any) => {
+    // First try to find with both phone AND agent match
+    let existingConversation = allConversations?.conversations?.find((c: any) => {
       // Normalize the stored phone number for comparison
       const storedPhone = normalizePhoneNumber(c.clientPhone);
       const phoneMatch = storedPhone === clientPhone;
-      const agentMatch = c.agent?.id === agentId;
-      console.log(`Checking conversation ${c.id}: phone=${phoneMatch} (${storedPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.id} vs ${agentId})`);
+      const hasAgent = c.agent && c.agent.length > 0;
+      const agentMatch = hasAgent && c.agent[0].id === agentId;
+      console.log(`Checking conversation ${c.id.substring(0, 8)}: phone=${phoneMatch} (${storedPhone} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.[0]?.id || 'undefined'} vs ${agentId})`);
       return phoneMatch && agentMatch;
     });
 
-    console.log("Existing conversation found:", !!existingConversation);
+    // If not found with agent, try to find by phone only (to fix old conversations)
+    if (!existingConversation) {
+      console.log("📞 No conversation with agent link found, searching by phone only...");
+      existingConversation = allConversations?.conversations?.find((c: any) => {
+        const storedPhone = normalizePhoneNumber(c.clientPhone);
+        return storedPhone === clientPhone;
+      });
+
+      if (existingConversation) {
+        console.log(`⚠️  Found conversation without agent link, will fix: ${existingConversation.id.substring(0, 8)}`);
+      } else {
+        console.log("❌ No existing conversation found at all");
+      }
+    }
+
+    console.log(`✅ Existing conversation found: ${!!existingConversation}`);
     if (existingConversation) {
-      console.log("Matched conversation ID:", existingConversation.id);
+      console.log("Matched conversation ID:", existingConversation.id.substring(0, 8));
     }
 
     let conversationId: string;
@@ -165,14 +182,27 @@ export const handler = async (event: any) => {
     if (existingConversation) {
       // Existing conversation
       conversationId = existingConversation.id;
-      console.log("Using existing conversation:", conversationId);
+      console.log("Using existing conversation:", conversationId.substring(0, 8));
 
-      // Update lastMessageAt
-      await db.transact([
+      const hasAgent = existingConversation.agent && existingConversation.agent.length > 0;
+      const transactions: any[] = [
+        // Update lastMessageAt
         db.tx.conversations[conversationId].update({
           lastMessageAt: Date.now()
         })
-      ]);
+      ];
+
+      // If conversation doesn't have agent link, add it
+      if (!hasAgent) {
+        console.log("🔧 Fixing missing agent link for conversation:", conversationId.substring(0, 8));
+        transactions.push(
+          db.tx.conversations[conversationId].link({
+            agent: agentId
+          })
+        );
+      }
+
+      await db.transact(transactions);
     } else {
       // Create new conversation
       conversationId = crypto.randomUUID();
