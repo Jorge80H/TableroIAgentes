@@ -67,38 +67,53 @@ export const handler = async (event: any) => {
     }
 
     // Send to n8n webhook
-    console.log("Sending message to n8n webhook:", agent.webhookUrl);
+    console.log("📤 Sending message to n8n webhook:", {
+      url: agent.webhookUrl,
+      clientPhone: conversation.clientPhone,
+      message: message.substring(0, 50)
+    });
+
+    const payload = {
+      conversationId,
+      clientPhone: conversation.clientPhone,
+      clientName: conversation.clientName,
+      message,
+      senderType: "HUMAN",
+      agentId: agent.id
+    };
+
+    console.log("📦 Webhook payload:", JSON.stringify(payload));
 
     const webhookResponse = await fetch(agent.webhookUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${agent.apiToken}`
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        conversationId,
-        clientPhone: conversation.clientPhone,
-        message,
-        senderType: "HUMAN"
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!webhookResponse.ok) {
-      console.error("n8n webhook failed:", webhookResponse.status, await webhookResponse.text());
+      const errorText = await webhookResponse.text();
+      console.error("❌ n8n webhook failed:", webhookResponse.status, errorText);
       return {
         statusCode: 500,
         body: JSON.stringify({
           error: "Failed to send message to n8n",
-          status: webhookResponse.status
+          status: webhookResponse.status,
+          details: errorText
         }),
       };
     }
+
+    const responseData = await webhookResponse.text();
+    console.log("✅ n8n webhook success:", webhookResponse.status, responseData);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        webhookStatus: webhookResponse.status
+        webhookStatus: webhookResponse.status,
+        response: responseData
       }),
     };
 
