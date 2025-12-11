@@ -103,32 +103,36 @@ export function registerWebhooks(app: Express) {
       }
 
       // Find existing conversation or create new one
-      // Note: We need to fetch all conversations for this agent and normalize phone numbers
-      // because InstantDB queries don't support transformation functions
+      // Query ALL conversations (not just by agent) because old conversations may not have agent link
       const { data: conversationData } = await db.query({
         conversations: {
-          $: {
-            where: {
-              "agent.id": agentId
-            }
-          }
+          agent: {}  // Include agent data to check the link
         }
       });
 
       // Find existing conversation with normalized phone number
-      console.log("🔍 Searching for existing conversation:", {
-        searchingFor: clientPhone,
-        foundConversations: conversationData?.conversations?.map((c: any) => ({
-          id: c.id.substring(0, 8),
-          phone: c.clientPhone,
-          normalized: normalizePhoneNumber(c.clientPhone),
-          matches: normalizePhoneNumber(c.clientPhone) === clientPhone
-        }))
+      // First try to find one with matching phone AND agent
+      let existingConversation = conversationData?.conversations?.find((c: any) => {
+        const phoneMatch = normalizePhoneNumber(c.clientPhone) === clientPhone;
+        const agentMatch = c.agent && c.agent.length > 0 && c.agent[0].id === agentId;
+
+        console.log(`🔍 Checking conversation ${c.id.substring(0, 8)}: phone=${phoneMatch} (${normalizePhoneNumber(c.clientPhone)} vs ${clientPhone}), agent=${agentMatch} (${c.agent?.[0]?.id || 'undefined'} vs ${agentId})`);
+
+        return phoneMatch && agentMatch;
       });
 
-      const existingConversation = conversationData?.conversations?.find((c: any) =>
-        normalizePhoneNumber(c.clientPhone) === clientPhone
-      );
+      // If not found, try to find any conversation with matching phone (to fix old conversations)
+      if (!existingConversation) {
+        existingConversation = conversationData?.conversations?.find((c: any) => {
+          return normalizePhoneNumber(c.clientPhone) === clientPhone;
+        });
+
+        if (existingConversation) {
+          console.log(`⚠️  Found conversation without agent link, will fix: ${existingConversation.id.substring(0, 8)}`);
+        }
+      }
+
+      console.log(`Existing conversation found: ${!!existingConversation}`);
 
       let conversationId: string;
 
@@ -146,7 +150,9 @@ export function registerWebhooks(app: Express) {
         conversationId = existingConversation.id;
         console.log("✅ Found existing conversation:", conversationId.substring(0, 8));
 
-        await db.transact([
+        const hasAgentLink = existingConversation.agent && existingConversation.agent.length > 0;
+
+        const transactions = [
           // Update conversation lastMessageAt
           db.tx.conversations[conversationId].update({
             lastMessageAt: Date.now()
@@ -161,7 +167,19 @@ export function registerWebhooks(app: Express) {
           db.tx.messages[messageId].link({
             conversation: conversationId
           })
-        ]);
+        ];
+
+        // If conversation doesn't have agent link, add it
+        if (!hasAgentLink) {
+          console.log("🔧 Fixing missing agent link for conversation:", conversationId.substring(0, 8));
+          transactions.push(
+            db.tx.conversations[conversationId].link({
+              agent: agentId
+            })
+          );
+        }
+
+        await db.transact(transactions);
       } else {
         // Create new conversation and message in one transaction
         conversationId = crypto.randomUUID();
