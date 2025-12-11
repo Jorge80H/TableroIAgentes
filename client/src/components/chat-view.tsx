@@ -235,12 +235,16 @@ export function ChatView({ conversation }: ChatViewProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Debug: Show message count */}
+        <div className="text-xs text-muted-foreground text-center mb-2">
+          {messages.length} message(s) in this conversation
+        </div>
         {messages && messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">No messages yet</p>
           </div>
         ) : (
-          messages?.map((message) => (
+          messages?.map((message, index) => (
             <div
               key={message.id}
               className={`flex ${getMessageAlignment(message.senderType)}`}
@@ -251,6 +255,10 @@ export function ChatView({ conversation }: ChatViewProps) {
                   className={`rounded-lg p-3 ${getMessageBubbleClass(message.senderType)}`}
                   data-testid={`message-bubble-${message.senderType.toLowerCase()}`}
                 >
+                  {/* Debug: Show message index and ID */}
+                  <p className="text-xs text-muted-foreground mb-1 opacity-50">
+                    #{index + 1} - {message.id.substring(0, 8)}
+                  </p>
                   {message.senderName && (
                     <p className="text-xs font-medium mb-1 opacity-70">
                       {message.senderName}
