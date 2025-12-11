@@ -51,15 +51,21 @@ export function registerWebhooks(app: Express) {
     try {
       let { agentId, apiToken, clientPhone, clientName, message, senderType = "CLIENT" } = req.body;
 
+      // Log raw phone number before normalization
+      console.log("📨 Incoming message (raw):", {
+        senderType,
+        rawClientPhone: clientPhone,
+        clientName
+      });
+
       // Normalize phone number
+      const originalPhone = clientPhone;
       clientPhone = normalizePhoneNumber(clientPhone);
 
-      // Log incoming message for debugging
-      console.log("📨 Incoming message:", {
-        senderType,
-        agentId: agentId?.substring(0, 8) + "...",
-        clientPhone: clientPhone?.substring(0, 8) + "...",
-        messagePreview: message?.substring(0, 50) + "..."
+      // Log after normalization
+      console.log("📨 After normalization:", {
+        original: originalPhone,
+        normalized: clientPhone
       });
 
       // Validate required fields
@@ -110,6 +116,16 @@ export function registerWebhooks(app: Express) {
       });
 
       // Find existing conversation with normalized phone number
+      console.log("🔍 Searching for existing conversation:", {
+        searchingFor: clientPhone,
+        foundConversations: conversationData?.conversations?.map((c: any) => ({
+          id: c.id.substring(0, 8),
+          phone: c.clientPhone,
+          normalized: normalizePhoneNumber(c.clientPhone),
+          matches: normalizePhoneNumber(c.clientPhone) === clientPhone
+        }))
+      });
+
       const existingConversation = conversationData?.conversations?.find((c: any) =>
         normalizePhoneNumber(c.clientPhone) === clientPhone
       );
@@ -119,6 +135,7 @@ export function registerWebhooks(app: Express) {
       if (existingConversation) {
         // Existing conversation
         conversationId = existingConversation.id;
+        console.log("✅ Found existing conversation:", conversationId.substring(0, 8));
 
         // Update lastMessageAt
         await db.transact([
@@ -129,6 +146,7 @@ export function registerWebhooks(app: Express) {
       } else {
         // Create new conversation
         conversationId = crypto.randomUUID();
+        console.log("🆕 Creating NEW conversation:", conversationId.substring(0, 8));
 
         await db.transact([
           db.tx.conversations[conversationId].update({
