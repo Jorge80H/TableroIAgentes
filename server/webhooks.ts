@@ -132,55 +132,65 @@ export function registerWebhooks(app: Express) {
 
       let conversationId: string;
 
+      // Create message first
+      const messageId = crypto.randomUUID();
+
+      console.log("✅ Creating message:", {
+        messageId: messageId.substring(0, 8) + "...",
+        senderType,
+        senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+      });
+
       if (existingConversation) {
-        // Existing conversation
+        // Existing conversation - update it and add message in one transaction
         conversationId = existingConversation.id;
         console.log("✅ Found existing conversation:", conversationId.substring(0, 8));
 
-        // Update lastMessageAt
         await db.transact([
+          // Update conversation lastMessageAt
           db.tx.conversations[conversationId].update({
             lastMessageAt: Date.now()
+          }),
+          // Create message
+          db.tx.messages[messageId].update({
+            senderType,
+            content: message,
+            senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+          }),
+          // Link message to conversation
+          db.tx.messages[messageId].link({
+            conversation: conversationId
           })
         ]);
       } else {
-        // Create new conversation
+        // Create new conversation and message in one transaction
         conversationId = crypto.randomUUID();
         console.log("🆕 Creating NEW conversation:", conversationId.substring(0, 8));
 
         await db.transact([
+          // Create conversation
           db.tx.conversations[conversationId].update({
             clientPhone,
             clientName: clientName || clientPhone,
             status: "AI_ACTIVE",
             lastMessageAt: Date.now()
           }),
+          // Link conversation to agent
           db.tx.conversations[conversationId].link({
             agent: agentId
+          }),
+          // Create message
+          db.tx.messages[messageId].update({
+            senderType,
+            content: message,
+            senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+          }),
+          // Link message to conversation
+          db.tx.messages[messageId].link({
+            conversation: conversationId
           })
         ]);
       }
-
-      // Create message
-      const messageId = crypto.randomUUID();
-
-      console.log("✅ Creating message:", {
-        messageId: messageId.substring(0, 8) + "...",
-        conversationId: conversationId.substring(0, 8) + "...",
-        senderType,
-        senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
-      });
-
-      await db.transact([
-        db.tx.messages[messageId].update({
-          senderType,
-          content: message,
-          senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
-        }),
-        db.tx.messages[messageId].link({
-          conversation: conversationId
-        })
-      ]);
 
       console.log("💾 Message saved successfully");
 

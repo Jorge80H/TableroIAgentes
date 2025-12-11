@@ -9,7 +9,11 @@ export default function Conversations() {
 
   const { isLoading, data } = db.useQuery({
     conversations: {
-      messages: {},
+      messages: {
+        $: {
+          limit: 1000 // Ensure we get all messages
+        }
+      },
       agent: {}
     }
   });
