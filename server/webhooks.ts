@@ -166,7 +166,8 @@ export function registerWebhooks(app: Express) {
           db.tx.messages[messageId].update({
             senderType,
             content: message,
-            senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+            senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant",
+            createdAt: Date.now()
           }),
           // Link message to conversation
           db.tx.messages[messageId].link({
@@ -206,7 +207,8 @@ export function registerWebhooks(app: Express) {
           db.tx.messages[messageId].update({
             senderType,
             content: message,
-            senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant"
+            senderName: senderType === "CLIENT" ? (clientName || clientPhone) : "AI Assistant",
+            createdAt: Date.now()
           }),
           // Link message to conversation
           db.tx.messages[messageId].link({

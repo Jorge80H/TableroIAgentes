@@ -163,6 +163,38 @@ const { user, isLoading } = db.useAuth();
 
 ## n8n Integration
 
+### n8n MCP Server
+
+Este proyecto incluye el MCP de n8n ([n8n-mcp](https://github.com/czlonkowski/n8n-mcp)) configurado en [.mcp.json](.mcp.json). Proporciona acceso a:
+
+- **Documentación de nodos**: Información sobre los 1,084+ nodos de n8n
+- **Propiedades y operaciones**: Detalles de configuración de cada nodo
+- **API de n8n** (opcional): Conexión directa a tu instancia de n8n
+
+**Configuración con API de n8n (opcional):**
+
+Para conectar con tu instancia de n8n, añade las siguientes variables de entorno al archivo `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "npx",
+      "args": ["n8n-mcp"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": "https://tu-instancia-n8n.com",
+        "N8N_API_KEY": "tu-api-key"
+      }
+    }
+  }
+}
+```
+
+### Webhook Integration
+
 When a human agent sends a message while in HUMAN_ACTIVE mode, the backend calls the agent's `webhookUrl` with:
 ```json
 {
