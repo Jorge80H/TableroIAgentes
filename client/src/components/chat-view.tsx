@@ -29,17 +29,7 @@ export function ChatView({ conversation }: ChatViewProps) {
     });
   }, [conversation?.messages]);
 
-  // Debug: log messages to console
-  console.log('Conversation messages:', {
-    conversationId: conversation?.id,
-    messageCount: messages.length,
-    messages: messages.map((m: any) => ({
-      id: m.id,
-      senderType: m.senderType,
-      content: m.content?.substring(0, 50),
-      createdAt: m.createdAt
-    }))
-  });
+
 
   const sendMessage = async (content: string) => {
     if (!conversation?.id) return;
@@ -244,10 +234,7 @@ export function ChatView({ conversation }: ChatViewProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {/* Debug: Show message count */}
-        <div className="text-xs text-muted-foreground text-center mb-2">
-          {messages.length} message(s) in this conversation
-        </div>
+
         {messages && messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">No messages yet</p>
@@ -264,10 +251,7 @@ export function ChatView({ conversation }: ChatViewProps) {
                   className={`rounded-lg p-3 ${getMessageBubbleClass(message.senderType)}`}
                   data-testid={`message-bubble-${message.senderType.toLowerCase()}`}
                 >
-                  {/* Debug: Show message index and ID */}
-                  <p className="text-xs text-muted-foreground mb-1 opacity-50">
-                    #{index + 1} - {message.id.substring(0, 8)}
-                  </p>
+
                   {message.senderName && (
                     <p className="text-xs font-medium mb-1 opacity-70">
                       {message.senderName}

@@ -22,18 +22,7 @@ export default function Conversations() {
 
   // Use useMemo to stabilize the selected conversation object
   const selectedConversation = useMemo(() => {
-    const conv = conversations?.find((c: any) => c.id === selectedConversationId);
-
-    // Debug: Log when selected conversation changes
-    if (conv && selectedConversationId) {
-      console.log('Selected conversation updated:', {
-        id: selectedConversationId.substring(0, 8),
-        messageCount: conv.messages?.length,
-        messageIds: conv.messages?.map((m: any) => m.id.substring(0, 8))
-      });
-    }
-
-    return conv;
+    return conversations?.find((c: any) => c.id === selectedConversationId);
   }, [conversations, selectedConversationId]);
 
   if (isLoading) {
