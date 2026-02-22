@@ -29,7 +29,8 @@ export function ChatView({ conversation }: ChatViewProps) {
       // If timestamps are exactly the same or very close (within 1 second),
       // we assume the user's message should come before the AI's response.
       // This handles cases where n8n saves both simultaneously.
-      if (Math.abs(timeA - timeB) < 1000) {
+      // Only apply this tie-breaker if both messages have a valid createdAt timestamp.
+      if (timeA > 0 && timeB > 0 && Math.abs(timeA - timeB) < 1000) {
         if (a.senderType === "CLIENT" && b.senderType !== "CLIENT") return -1;
         if (b.senderType === "CLIENT" && a.senderType !== "CLIENT") return 1;
       }
