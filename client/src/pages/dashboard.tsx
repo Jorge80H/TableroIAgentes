@@ -2,19 +2,20 @@ import { db } from "@/lib/instant";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, MessageSquare, UserCheck, BotIcon } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import type { Agent, Conversation } from "@shared/schema";
 
 export default function Dashboard() {
   const { data: agentsData } = db.useQuery({ agents: {} });
   const { data: conversationsData } = db.useQuery({ conversations: {} });
 
-  const agents = agentsData?.agents || [];
-  const conversations = conversationsData?.conversations || [];
+  const agents = (agentsData?.agents || []) as Agent[];
+  const conversations = (conversationsData?.conversations || []) as Conversation[];
 
-  const activeAgents = agents.filter((a: any) => a.isActive).length;
+  const activeAgents = agents.filter((a: Agent) => a.isActive).length;
   const totalConversations = conversations.length;
-  const aiActiveCount = conversations.filter((c: any) => c.status === "AI_ACTIVE").length;
-  const humanActiveCount = conversations.filter((c: any) => c.status === "HUMAN_ACTIVE").length;
-  const archivedCount = conversations.filter((c: any) => c.status === "ARCHIVED").length;
+  const aiActiveCount = conversations.filter((c: Conversation) => c.status === "AI_ACTIVE").length;
+  const humanActiveCount = conversations.filter((c: Conversation) => c.status === "HUMAN_ACTIVE").length;
+  const archivedCount = conversations.filter((c: Conversation) => c.status === "ARCHIVED").length;
 
   const stats = [
     {
@@ -152,9 +153,9 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {conversations
                   .slice()
-                  .sort((a: any, b: any) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0))
+                  .sort((a: Conversation, b: Conversation) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0))
                   .slice(0, 5)
-                  .map((conv: any) => (
+                  .map((conv: Conversation) => (
                     <div
                       key={conv.id}
                       className="flex items-center justify-between p-3 rounded-md bg-muted/50"
@@ -168,10 +169,10 @@ export default function Dashboard() {
                       </div>
                       <span
                         className={`text-xs px-2 py-1 rounded flex-shrink-0 ml-2 ${conv.status === "AI_ACTIVE"
-                            ? "bg-green-600/10 text-green-700 dark:text-green-400"
-                            : conv.status === "HUMAN_ACTIVE"
-                              ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
-                              : "bg-gray-600/10 text-gray-500"
+                          ? "bg-green-600/10 text-green-700 dark:text-green-400"
+                          : conv.status === "HUMAN_ACTIVE"
+                            ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
+                            : "bg-gray-600/10 text-gray-500"
                           }`}
                       >
                         {conv.status === "AI_ACTIVE" ? "AI" : conv.status === "HUMAN_ACTIVE" ? "Human" : "Archived"}
@@ -197,7 +198,7 @@ export default function Dashboard() {
             </p>
           ) : (
             <div className="space-y-3">
-              {agents.slice(0, 5).map((agent: any) => (
+              {agents.slice(0, 5).map((agent: Agent) => (
                 <div
                   key={agent.id}
                   className="flex items-center justify-between p-3 rounded-md bg-muted/50"
@@ -214,8 +215,8 @@ export default function Dashboard() {
                   </div>
                   <span
                     className={`text-xs px-2 py-1 rounded flex-shrink-0 ml-2 ${agent.isActive
-                        ? "bg-green-600/10 text-green-700 dark:text-green-400"
-                        : "bg-gray-600/10 text-gray-700 dark:text-gray-400"
+                      ? "bg-green-600/10 text-green-700 dark:text-green-400"
+                      : "bg-gray-600/10 text-gray-700 dark:text-gray-400"
                       }`}
                   >
                     {agent.isActive ? "Active" : "Inactive"}

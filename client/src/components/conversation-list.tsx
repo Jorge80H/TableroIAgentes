@@ -31,25 +31,12 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "AI_ACTIVE" | "HUMAN_ACTIVE">("all");
 
-  // Deduplicate conversations by normalized phone number
-  // Keep the most recent conversation for each unique phone number
-  const deduplicatedConversations = useMemo(() => {
-    const conversationMap = new Map<string, Conversation>();
-
-    conversations.forEach((conv) => {
-      const normalizedPhone = normalizePhoneNumber(conv.clientPhone);
-      const existing = conversationMap.get(normalizedPhone);
-
-      // Keep the conversation with the most recent message
-      if (!existing || conv.lastMessageAt > existing.lastMessageAt) {
-        conversationMap.set(normalizedPhone, conv);
-      }
-    });
-
-    return Array.from(conversationMap.values());
+  // Sort all conversations by most recent message
+  const sortedConversations = useMemo(() => {
+    return [...conversations].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
   }, [conversations]);
 
-  const filteredConversations = deduplicatedConversations.filter((conv) => {
+  const filteredConversations = sortedConversations.filter((conv) => {
     const normalizedPhone = normalizePhoneNumber(conv.clientPhone);
     const matchesSearch =
       conv.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,7 +67,7 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
     <div className="w-80 border-r border-border bg-card flex flex-col">
       <div className="p-4 border-b border-border space-y-4">
         <h2 className="text-lg font-semibold">Conversations</h2>
-        
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -113,11 +100,10 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
               <button
                 key={conversation.id}
                 onClick={() => onSelect(conversation.id)}
-                className={`w-full text-left p-3 rounded-md hover-elevate transition-colors ${
-                  selectedId === conversation.id
+                className={`w-full text-left p-3 rounded-md hover-elevate transition-colors ${selectedId === conversation.id
                     ? "bg-accent border-l-3 border-primary"
                     : ""
-                }`}
+                  }`}
                 data-testid={`conversation-item-${conversation.id}`}
               >
                 <div className="flex items-start justify-between mb-1">
@@ -128,9 +114,17 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                     {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mb-2 truncate">
-                  {conversation.clientPhone}
-                </p>
+                <div className="flex items-center text-xs text-muted-foreground mb-2 truncate">
+                  <span>{conversation.clientPhone}</span>
+                  {conversation.agent && conversation.agent.length > 0 && (
+                    <>
+                      <span className="mx-1">•</span>
+                      <span className="truncate max-w-[100px]" title={conversation.agent[0].name}>
+                        {conversation.agent[0].name}
+                      </span>
+                    </>
+                  )}
+                </div>
                 {getStatusBadge(conversation.status)}
               </button>
             ))}

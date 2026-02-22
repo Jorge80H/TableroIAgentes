@@ -110,13 +110,6 @@ export function registerWebhooks(app: Express) {
         return phoneMatch && agentMatch;
       });
 
-      // If not found, try to find any conversation with matching phone
-      if (!existingConversation) {
-        existingConversation = conversationData?.conversations?.find((c: any) => {
-          return normalizePhoneNumber(c.clientPhone) === clientPhone;
-        });
-      }
-
       let conversationId: string;
       const messageId = crypto.randomUUID();
 

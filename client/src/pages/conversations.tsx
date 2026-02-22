@@ -18,7 +18,7 @@ export default function Conversations() {
     }
   });
 
-  const conversations = data?.conversations || [];
+  const conversations = (data?.conversations || []) as any[];
 
   // Use useMemo to stabilize the selected conversation object
   const selectedConversation = useMemo(() => {

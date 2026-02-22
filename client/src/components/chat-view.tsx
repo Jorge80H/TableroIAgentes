@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { db } from "@/lib/instant";
-import type { Message } from "@shared/schema";
+import type { Message, Conversation } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import { formatDistanceToNow } from "date-fns";
 import ReactMarkdown from "react-markdown";
 
 interface ChatViewProps {
-  conversation: any;
+  conversation: Conversation;
 }
 
 export function ChatView({ conversation }: ChatViewProps) {
@@ -22,9 +22,18 @@ export function ChatView({ conversation }: ChatViewProps) {
   const messages = useMemo(() => {
     const msgs = conversation?.messages || [];
     // Sort by createdAt timestamp (oldest first)
-    return [...msgs].sort((a: any, b: any) => {
+    return [...msgs].sort((a: Message, b: Message) => {
       const timeA = a.createdAt || 0;
       const timeB = b.createdAt || 0;
+
+      // If timestamps are exactly the same or very close (within 1 second),
+      // we assume the user's message should come before the AI's response.
+      // This handles cases where n8n saves both simultaneously.
+      if (Math.abs(timeA - timeB) < 1000) {
+        if (a.senderType === "CLIENT" && b.senderType !== "CLIENT") return -1;
+        if (b.senderType === "CLIENT" && a.senderType !== "CLIENT") return 1;
+      }
+
       return timeA - timeB;
     });
   }, [conversation?.messages]);
@@ -190,8 +199,13 @@ export function ChatView({ conversation }: ChatViewProps) {
             <h2 className="text-lg font-semibold" data-testid="text-conversation-client-name">
               {conversation.clientName || conversation.clientPhone}
             </h2>
-            <p className="text-sm text-muted-foreground" data-testid="text-conversation-client-phone">
-              {conversation.clientPhone}
+            <p className="text-sm text-muted-foreground flex items-center gap-2" data-testid="text-conversation-client-phone">
+              <span>{conversation.clientPhone}</span>
+              {conversation.agent && conversation.agent.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  Bot: {conversation.agent[0].name}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3">

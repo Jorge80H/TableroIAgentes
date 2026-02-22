@@ -18,13 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type Agent = {
-  id: string;
-  name: string;
-  webhookUrl: string;
-  apiToken: string;
-  isActive: boolean;
-};
+import type { Agent } from "@shared/schema";
 
 export default function Agents() {
   const { toast } = useToast();
@@ -46,7 +40,7 @@ export default function Agents() {
 
   // Query agents from InstantDB
   const { isLoading, error, data } = db.useQuery({ agents: {} });
-  const agents = data?.agents || [];
+  const agents = (data?.agents || []) as Agent[];
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -197,7 +191,7 @@ export default function Agents() {
       )}
 
       <CreateAgentDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
-      
+
       {editingAgent && (
         <EditAgentDialog
           agent={editingAgent}

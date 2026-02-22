@@ -41,8 +41,8 @@ type Schema = {
   };
 };
 
-// Initialize InstantDB
-export const db = init<Schema>({ appId: APP_ID });
+// Initialize InstantDB without strict Schema to avoid TxChunk errors with relations
+export const db = init({ appId: APP_ID });
 
 // Export types for use in components
 export type { Schema };
