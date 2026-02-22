@@ -31,9 +31,27 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "AI_ACTIVE" | "HUMAN_ACTIVE">("all");
 
-  // Sort all conversations by most recent message
+  // Deduplicate and sort conversations by most recent message
   const sortedConversations = useMemo(() => {
-    return [...conversations].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+    // We want to combine conversations that are from the SAME phone number AND the SAME agent
+    const conversationMap = new Map<string, Conversation>();
+
+    conversations.forEach((conv) => {
+      const normalizedPhone = normalizePhoneNumber(conv.clientPhone);
+      // Create a unique key combining phone and agent ID
+      const agentId = conv.agent && conv.agent.length > 0 ? conv.agent[0].id : 'no-agent';
+      const uniqueKey = `${normalizedPhone}-${agentId}`;
+      const existing = conversationMap.get(uniqueKey);
+
+      // Keep the conversation with the most recent message
+      if (!existing || (conv.lastMessageAt || 0) > (existing.lastMessageAt || 0)) {
+        conversationMap.set(uniqueKey, conv);
+      }
+    });
+
+    return Array.from(conversationMap.values()).sort(
+      (a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)
+    );
   }, [conversations]);
 
   const filteredConversations = sortedConversations.filter((conv) => {
@@ -101,8 +119,8 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                 key={conversation.id}
                 onClick={() => onSelect(conversation.id)}
                 className={`w-full text-left p-3 rounded-md hover-elevate transition-colors ${selectedId === conversation.id
-                    ? "bg-accent border-l-3 border-primary"
-                    : ""
+                  ? "bg-accent border-l-3 border-primary"
+                  : ""
                   }`}
                 data-testid={`conversation-item-${conversation.id}`}
               >

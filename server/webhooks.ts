@@ -106,7 +106,16 @@ export function registerWebhooks(app: Express) {
       // First try to find one with matching phone AND agent
       let existingConversation = conversationData?.conversations?.find((c: any) => {
         const phoneMatch = normalizePhoneNumber(c.clientPhone) === clientPhone;
-        const agentMatch = c.agent && c.agent.length > 0 && c.agent[0].id === agentId;
+
+        // Safely check for agent match handling possible undefined or empty arrays
+        let agentMatch = false;
+        if (c.agent && Array.isArray(c.agent) && c.agent.length > 0) {
+          agentMatch = c.agent.some((a: any) => a.id === agentId);
+        } else if (c.agent && typeof c.agent === 'object' && !Array.isArray(c.agent)) {
+          // Fallback in case it's an object instead of array
+          agentMatch = (c.agent as any).id === agentId;
+        }
+
         return phoneMatch && agentMatch;
       });
 
