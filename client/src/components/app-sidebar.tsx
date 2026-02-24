@@ -17,10 +17,12 @@ import {
   ClipboardList,
   Settings,
   LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 const menuItems = [
   {
@@ -52,7 +54,7 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
-  const { user } = db.useAuth();
+  const { user, isSuperAdmin } = useCurrentUser();
 
   const logout = () => {
     db.auth.signOut();
@@ -81,6 +83,16 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isSuperAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/admin"}>
+                    <Link href="/admin" data-testid="link-admin">
+                      <ShieldAlert className="h-4 w-4" />
+                      <span>Admin Panel</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

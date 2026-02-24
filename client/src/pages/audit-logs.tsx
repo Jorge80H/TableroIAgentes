@@ -1,4 +1,5 @@
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   Table,
   TableBody,
@@ -13,7 +14,10 @@ import { formatDistanceToNow } from "date-fns";
 import { ClipboardList } from "lucide-react";
 
 export default function AuditLogs() {
-  const { isLoading, data } = db.useQuery({ auditLogs: {} });
+  const { organizationId, isSuperAdmin } = useCurrentUser();
+  const orgFilter = isSuperAdmin ? {} : { $: { where: { 'agent.organization.id': organizationId || 'none' } } };
+
+  const { isLoading, data } = db.useQuery({ auditLogs: orgFilter });
   const logs = data?.auditLogs || [];
 
   const getActionBadge = (action: string) => {

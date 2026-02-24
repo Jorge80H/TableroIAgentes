@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConversationList } from "@/components/conversation-list";
 import { ChatView } from "@/components/chat-view";
 import { MessageSquare } from "lucide-react";
@@ -7,8 +8,12 @@ import { MessageSquare } from "lucide-react";
 export default function Conversations() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
+  const { organizationId, isSuperAdmin } = useCurrentUser();
+  const orgFilter = isSuperAdmin ? {} : { $: { where: { 'organization.id': organizationId || 'none' } } };
+
   const { isLoading, data } = db.useQuery({
     conversations: {
+      ...orgFilter,
       messages: {
         $: {
           limit: 1000 // Ensure we get all messages

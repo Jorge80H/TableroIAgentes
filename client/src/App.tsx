@@ -13,10 +13,12 @@ import Agents from "@/pages/agents";
 import Conversations from "@/pages/conversations";
 import AuditLogs from "@/pages/audit-logs";
 import Settings from "@/pages/settings";
+import AdminPanel from "@/pages/admin-panel";
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = db.useAuth();
+  const { user, isLoading } = useCurrentUser();
 
   if (isLoading) {
     return (
@@ -55,6 +57,7 @@ function AuthenticatedLayout() {
               <Route path="/conversations" component={() => <ProtectedRoute component={Conversations} />} />
               <Route path="/audit-logs" component={() => <ProtectedRoute component={AuditLogs} />} />
               <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
+              <Route path="/admin" component={() => <ProtectedRoute component={AdminPanel} />} />
               <Route component={NotFound} />
             </Switch>
           </main>

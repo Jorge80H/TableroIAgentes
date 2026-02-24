@@ -1,12 +1,17 @@
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, MessageSquare, UserCheck, BotIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { Agent, Conversation } from "@shared/schema";
 
 export default function Dashboard() {
-  const { data: agentsData } = db.useQuery({ agents: {} });
-  const { data: conversationsData } = db.useQuery({ conversations: {} });
+  const { organizationId, isSuperAdmin } = useCurrentUser();
+  const queryFilter = isSuperAdmin ? {} : { $: { where: { 'organization.id': organizationId || 'none' } } };
+
+  const { data: agentsData } = db.useQuery({ agents: queryFilter });
+  const { data: conversationsData } = db.useQuery({ conversations: queryFilter });
 
   const agents = (agentsData?.agents || []) as Agent[];
   const conversations = (conversationsData?.conversations || []) as Conversation[];
@@ -61,11 +66,43 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Overview of your WhatsApp conversation management
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Overview of your WhatsApp conversation management
+          </p>
+        </div>
+        <Button
+          variant="destructive"
+          onClick={async () => {
+            const targetConversations = conversations.filter((c: any) => {
+              const name = (c.clientName || c.clientPhone || "").toLowerCase();
+              return name.includes("jorge") && !name.includes("bot");
+            });
+
+            if (targetConversations.length === 0) {
+              alert("No se encontraron conversaciones de Jorge.");
+              return;
+            }
+
+            if (confirm(`¿Estás seguro de eliminar ${targetConversations.length} conversaciones de Jorge?`)) {
+              const txs: any[] = [];
+              for (const conv of targetConversations) {
+                if ((conv as any).messages) {
+                  for (const msg of (conv as any).messages) {
+                    txs.push(db.tx.messages[msg.id].delete());
+                  }
+                }
+                txs.push(db.tx.conversations[conv.id].delete());
+              }
+              await db.transact(txs);
+              alert(`¡Éxito! Se eliminaron ${targetConversations.length} conversaciones.`);
+            }
+          }}
+        >
+          Limpiar Chats de Jorge
+        </Button>
       </div>
 
       {/* Stat Cards */}

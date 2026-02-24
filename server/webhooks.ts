@@ -79,7 +79,8 @@ export function registerWebhooks(app: Express) {
             where: {
               id: agentId
             }
-          }
+          },
+          organization: {}
         }
       });
 
@@ -98,7 +99,8 @@ export function registerWebhooks(app: Express) {
       // Find existing conversation or create new one
       const { data: conversationData } = await db.query({
         conversations: {
-          agent: {}
+          agent: {},
+          organization: {}
         }
       });
 
@@ -150,12 +152,24 @@ export function registerWebhooks(app: Express) {
           );
         }
 
+        // Link organization if present and missing
+        const orgId = agent.organization?.[0]?.id;
+        const hasOrgLink = existingConversation.organization && existingConversation.organization.length > 0;
+        if (orgId && !hasOrgLink) {
+          transactions.push(
+            db.tx.conversations[conversationId].link({
+              organization: orgId
+            })
+          );
+        }
+
         await db.transact(transactions);
       } else {
         // Create new conversation and message
         conversationId = crypto.randomUUID();
 
-        await db.transact([
+        const orgId = agent.organization?.[0]?.id;
+        const createTx: any[] = [
           db.tx.conversations[conversationId].update({
             clientPhone,
             clientName: clientName || clientPhone,
@@ -174,7 +188,17 @@ export function registerWebhooks(app: Express) {
           db.tx.messages[messageId].link({
             conversation: conversationId
           })
-        ]);
+        ];
+
+        if (orgId) {
+          createTx.push(
+            db.tx.conversations[conversationId].link({
+              organization: orgId
+            })
+          );
+        }
+
+        await db.transact(createTx);
       }
 
       debugLog("✅ Message saved:", { conversationId: conversationId.substring(0, 8), messageId: messageId.substring(0, 8) });
@@ -220,7 +244,8 @@ export function registerWebhooks(app: Express) {
             where: {
               id: agentId
             }
-          }
+          },
+          organization: {}
         }
       });
 

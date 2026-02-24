@@ -3,6 +3,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAgentSchema, type InsertAgent, type Agent } from "@shared/schema";
 import { db } from "@/lib/instant";
 import { Button } from "@/components/ui/button";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +39,9 @@ interface EditAgentDialogProps {
 
 export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogProps) {
   const { toast } = useToast();
+  const { isSuperAdmin } = useCurrentUser();
+  const { data: orgsData } = db.useQuery(isSuperAdmin ? { organizations: {} } : null);
+  const organizations = orgsData?.organizations || [];
 
   const form = useForm<InsertAgent>({
     resolver: zodResolver(insertAgentSchema),
@@ -53,13 +64,20 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
 
   const updateAgent = async (data: InsertAgent) => {
     try {
-      await db.transact([
+      const txs = [
         db.tx.agents[agent.id].update({
           name: data.name,
           webhookUrl: data.webhookUrl,
-          apiToken: data.apiToken
+          apiToken: data.apiToken,
+          organizationId: isSuperAdmin ? data.organizationId : agent.organizationId
         })
-      ]);
+      ];
+
+      if (isSuperAdmin && data.organizationId && data.organizationId !== agent.organizationId) {
+        txs.push(db.tx.agents[agent.id].link({ organization: data.organizationId }));
+      }
+
+      await db.transact(txs);
       toast({
         title: "Agent updated",
         description: "Your agent has been updated successfully.",
@@ -154,6 +172,36 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
                 </FormItem>
               )}
             />
+
+            {isSuperAdmin && (
+              <FormField
+                control={form.control}
+                name="organizationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organization (Client)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an organization" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {organizations.map((org: any) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      The client this agent handles conversations for.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button

@@ -24,12 +24,21 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const createAgentSchema = z.object({
   name: z.string().min(1, "Name is required"),
   webhookUrl: z.string().url("Must be a valid URL"),
   apiToken: z.string().min(1, "API token is required"),
   isActive: z.boolean().default(true),
+  organizationId: z.string().optional(),
 });
 
 interface CreateAgentDialogProps {
@@ -42,6 +51,9 @@ type CreateAgentInput = z.infer<typeof createAgentSchema>;
 export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps) {
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
+  const { isSuperAdmin, organizationId: currentOrgId } = useCurrentUser();
+  const { data: orgsData } = db.useQuery(isSuperAdmin ? { organizations: {} } : null);
+  const organizations = orgsData?.organizations || [];
 
   const form = useForm<CreateAgentInput>({
     resolver: zodResolver(createAgentSchema),
@@ -50,6 +62,7 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
       webhookUrl: "",
       apiToken: "",
       isActive: true,
+      organizationId: "",
     },
   });
 
@@ -57,15 +70,23 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
     setIsCreating(true);
     try {
       const agentId = id();
+      const orgToAssign = isSuperAdmin ? data.organizationId : currentOrgId;
 
-      await db.transact([
+      const txs: any[] = [
         db.tx.agents[agentId].update({
           name: data.name,
           webhookUrl: data.webhookUrl,
           apiToken: data.apiToken,
           isActive: data.isActive,
+          organizationId: orgToAssign || null
         }),
-      ]);
+      ];
+
+      if (orgToAssign) {
+        txs.push(db.tx.agents[agentId].link({ organization: orgToAssign }));
+      }
+
+      await db.transact(txs);
 
       toast({
         title: "Agent created",
@@ -158,13 +179,40 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Secret token for authenticating webhook requests
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {isSuperAdmin && (
+              <FormField
+                control={form.control}
+                name="organizationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organization (Client)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an organization" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {organizations.map((org: any) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      The client this agent handles conversations for.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button

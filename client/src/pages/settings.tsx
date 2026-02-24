@@ -1,4 +1,5 @@
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,7 @@ import {
 import { useTheme } from "next-themes";
 
 export default function Settings() {
-  const { user } = db.useAuth();
+  const { user, isSuperAdmin, isAdmin } = useCurrentUser();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
 
@@ -106,8 +107,8 @@ export default function Settings() {
                 onClick={() => setTheme(value)}
                 data-testid={`button-theme-${value}`}
                 className={`flex flex-col items-center gap-2 p-3 rounded-md border-2 transition-colors ${theme === value
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-muted-foreground/50"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-muted-foreground/50"
                   }`}
               >
                 <Icon className={`h-5 w-5 ${theme === value ? "text-primary" : "text-muted-foreground"}`} />
@@ -167,6 +168,10 @@ export default function Settings() {
           <div className="flex justify-between">
             <span className="text-muted-foreground">Version</span>
             <span className="font-mono text-xs">1.0.0</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Role</span>
+            <span className="font-medium">{isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "Agent"}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Database</span>

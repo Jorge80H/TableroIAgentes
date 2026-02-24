@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { db } from "@/lib/instant";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Bot, Trash2, Edit, Copy, Check } from "lucide-react";
@@ -38,8 +39,11 @@ export default function Agents() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const { organizationId, isSuperAdmin } = useCurrentUser();
+  const orgFilter = isSuperAdmin ? {} : { $: { where: { 'organization.id': organizationId || 'none' } } };
+
   // Query agents from InstantDB
-  const { isLoading, error, data } = db.useQuery({ agents: {} });
+  const { isLoading, error, data } = db.useQuery({ agents: orgFilter });
   const agents = (data?.agents || []) as Agent[];
 
   const handleDelete = async (id: string) => {
