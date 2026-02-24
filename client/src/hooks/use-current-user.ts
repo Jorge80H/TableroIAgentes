@@ -1,5 +1,4 @@
 import { db } from "@/lib/instant";
-import type { User } from "@shared/schema";
 
 export function useCurrentUser() {
     const { user, isLoading: authLoading } = db.useAuth();
@@ -17,14 +16,18 @@ export function useCurrentUser() {
         } : null
     );
 
-    const currentUserRecord = data?.$users?.[0] as User | undefined;
+    const record = data?.$users?.[0] as any;
+
+    // InstantDB stores role in the `type` field (as seen in the dashboard)
+    const userRole = record?.type || record?.role || null;
+    const orgId = record?.organizationId || null;
 
     return {
         user,
-        record: currentUserRecord,
+        record,
         isLoading: authLoading || (!!user && queryLoading),
-        isSuperAdmin: currentUserRecord?.role === "SUPER_ADMIN",
-        isAdmin: currentUserRecord?.role === "ADMIN",
-        organizationId: currentUserRecord?.organizationId
+        isSuperAdmin: userRole === "SUPER_ADMIN",
+        isAdmin: userRole === "ADMIN",
+        organizationId: orgId
     };
 }
