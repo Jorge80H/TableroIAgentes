@@ -97,7 +97,7 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
           />
         </div>
 
-        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "AI_ACTIVE" | "HUMAN_ACTIVE")}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
             <TabsTrigger value="AI_ACTIVE" data-testid="tab-ai-active">AI</TabsTrigger>

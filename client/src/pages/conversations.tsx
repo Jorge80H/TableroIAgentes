@@ -4,16 +4,15 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConversationList } from "@/components/conversation-list";
 import { ChatView } from "@/components/chat-view";
 import { MessageSquare } from "lucide-react";
+import type { Conversation } from "@shared/schema";
 
 export default function Conversations() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   const { organizationId, isSuperAdmin } = useCurrentUser();
-  const orgFilter = isSuperAdmin ? {} : { $: { where: { 'organization.id': organizationId || 'none' } } };
 
   const { isLoading, data } = db.useQuery({
     conversations: {
-      ...orgFilter,
       messages: {
         $: {
           limit: 1000 // Ensure we get all messages
@@ -23,11 +22,14 @@ export default function Conversations() {
     }
   });
 
-  const conversations = (data?.conversations || []) as any[];
+  const allConversations = (data?.conversations || []) as Conversation[];
+  const conversations = isSuperAdmin 
+    ? allConversations 
+    : allConversations.filter((c: any) => c.agent?.[0]?.organizationId === organizationId);
 
   // Use useMemo to stabilize the selected conversation object
   const selectedConversation = useMemo(() => {
-    return conversations?.find((c: any) => c.id === selectedConversationId);
+    return conversations?.find((c: Conversation) => c.id === selectedConversationId);
   }, [conversations, selectedConversationId]);
 
   if (isLoading) {
@@ -58,7 +60,7 @@ export default function Conversations() {
         selectedId={selectedConversationId}
         onSelect={setSelectedConversationId}
       />
-      <ChatView conversation={selectedConversation} />
+      <ChatView conversation={selectedConversation as Conversation | undefined} />
     </div>
   );
 }

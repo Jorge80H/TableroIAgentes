@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import type { Organization } from "@shared/schema";
 import {
   Select,
   SelectContent,
@@ -53,7 +54,7 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
   const [isCreating, setIsCreating] = useState(false);
   const { isSuperAdmin, organizationId: currentOrgId } = useCurrentUser();
   const { data: orgsData } = db.useQuery(isSuperAdmin ? { organizations: {} } : null);
-  const organizations = orgsData?.organizations || [];
+  const organizations = (orgsData?.organizations || []) as Organization[];
 
   const form = useForm<CreateAgentInput>({
     resolver: zodResolver(createAgentSchema),
@@ -72,7 +73,7 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
       const agentId = id();
       const orgToAssign = isSuperAdmin ? data.organizationId : currentOrgId;
 
-      const txs: any[] = [
+      const txs = [
         db.tx.agents[agentId].update({
           name: data.name,
           webhookUrl: data.webhookUrl,
@@ -94,11 +95,10 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
       });
       form.reset();
       onOpenChange(false);
-    } catch (error: any) {
-      console.error("Create agent error:", error);
+    } catch (error: Error | unknown) {
       toast({
-        title: "Creation failed",
-        description: error.message || "Failed to create agent",
+        title: "Failed to create agent",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
@@ -198,7 +198,7 @@ export function CreateAgentDialog({ open, onOpenChange }: CreateAgentDialogProps
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {organizations.map((org: any) => (
+                        {organizations.map((org: Organization) => (
                           <SelectItem key={org.id} value={org.id}>
                             {org.name}
                           </SelectItem>

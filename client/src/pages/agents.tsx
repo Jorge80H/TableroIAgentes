@@ -40,7 +40,7 @@ export default function Agents() {
   };
 
   const { organizationId, isSuperAdmin } = useCurrentUser();
-  const orgFilter = isSuperAdmin ? {} : { $: { where: { 'organization.id': organizationId || 'none' } } };
+  const orgFilter = isSuperAdmin ? {} : { $: { where: { organizationId: organizationId || 'none' } } };
 
   // Query agents from InstantDB
   const { isLoading, error, data } = db.useQuery({ agents: orgFilter });

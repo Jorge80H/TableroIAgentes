@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, Users, Plus, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import type { Organization, User } from "@shared/schema";
 
 export default function AdminPanel() {
     const { isSuperAdmin } = useCurrentUser();
@@ -20,8 +21,8 @@ export default function AdminPanel() {
     const { data: orgsData } = db.useQuery(isSuperAdmin ? { organizations: { users: {}, agents: {} } } : null);
     const { data: usersData } = db.useQuery(isSuperAdmin ? { $users: {} } : null);
 
-    const organizations = orgsData?.organizations || [];
-    const usersList = usersData?.$users || [];
+    const organizations = (orgsData?.organizations || []) as unknown as Organization[];
+    const usersList = (usersData?.$users || []) as unknown as User[];
 
     const [newOrgName, setNewOrgName] = useState("");
     const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false);
@@ -49,12 +50,12 @@ export default function AdminPanel() {
             toast({ title: "Organization created" });
             setNewOrgName("");
             setIsOrgDialogOpen(false);
-        } catch (e: any) {
-            toast({ title: "Error", description: e.message, variant: "destructive" });
+        } catch (e: Error | unknown) {
+            toast({ title: "Error", description: e instanceof Error ? e.message : "An unexpected error occurred", variant: "destructive" });
         }
     };
 
-    const handleUpdateUser = async (userId: string, updates: any) => {
+    const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
         try {
             const txs = [db.tx.$users[userId].update(updates)];
 
@@ -65,8 +66,8 @@ export default function AdminPanel() {
 
             await db.transact(txs);
             toast({ title: "User updated successfully" });
-        } catch (e: any) {
-            toast({ title: "Error", description: e.message, variant: "destructive" });
+        } catch (e: Error | unknown) {
+            toast({ title: "Error", description: e instanceof Error ? e.message : "An unexpected error occurred", variant: "destructive" });
         }
     };
 
@@ -126,11 +127,11 @@ export default function AdminPanel() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {organizations.map((org: any) => (
+                                    {organizations.map((org: Organization) => (
                                         <TableRow key={org.id}>
                                             <TableCell className="font-medium">{org.name}</TableCell>
-                                            <TableCell>{org.agents?.length || 0}</TableCell>
-                                            <TableCell>{org.users?.length || 0}</TableCell>
+                                            <TableCell>{(org as any).agents?.length || 0}</TableCell>
+                                            <TableCell>{(org as any).users?.length || 0}</TableCell>
                                             <TableCell>{org.createdAt ? new Date(org.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
                                         </TableRow>
                                     ))}
@@ -159,13 +160,13 @@ export default function AdminPanel() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {usersList.map((usr: any) => (
+                                    {usersList.map((usr: User) => (
                                         <TableRow key={usr.id}>
                                             <TableCell>{usr.email}</TableCell>
                                             <TableCell>
                                                 <Select
                                                     defaultValue={usr.role || "AGENT"}
-                                                    onValueChange={(val) => handleUpdateUser(usr.id, { role: val })}
+                                                    onValueChange={(val) => handleUpdateUser(usr.id, { role: val as User['role'] })}
                                                 >
                                                     <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                                                     <SelectContent>
@@ -178,12 +179,12 @@ export default function AdminPanel() {
                                             <TableCell>
                                                 <Select
                                                     defaultValue={usr.organizationId || "none"}
-                                                    onValueChange={(val) => handleUpdateUser(usr.id, { organizationId: val === "none" ? null : val })}
+                                                    onValueChange={(val) => handleUpdateUser(usr.id, { organizationId: val === "none" ? undefined : val })}
                                                 >
                                                     <SelectTrigger className="w-48"><SelectValue placeholder="No Org" /></SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="none">-- None --</SelectItem>
-                                                        {organizations.map((o: any) => (
+                                                        {organizations.map((o: Organization) => (
                                                             <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                                                         ))}
                                                     </SelectContent>

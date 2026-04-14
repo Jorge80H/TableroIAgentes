@@ -15,9 +15,9 @@ import { ClipboardList } from "lucide-react";
 
 export default function AuditLogs() {
   const { organizationId, isSuperAdmin } = useCurrentUser();
-  const orgFilter = isSuperAdmin ? {} : { $: { where: { 'agent.organization.id': organizationId || 'none' } } };
-
-  const { isLoading, data } = db.useQuery({ auditLogs: orgFilter });
+  
+  // Only super admins can see audit logs
+  const { isLoading, data } = db.useQuery(isSuperAdmin ? { auditLogs: {} } : null);
   const logs = data?.auditLogs || [];
 
   const getActionBadge = (action: string) => {

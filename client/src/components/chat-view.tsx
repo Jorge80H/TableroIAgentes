@@ -8,9 +8,11 @@ import { MessageSquare, Send, UserCheck, BotIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import ReactMarkdown from "react-markdown";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface ChatViewProps {
-  conversation: Conversation;
+  conversation?: Conversation;
 }
 
 export function ChatView({ conversation }: ChatViewProps) {
@@ -91,11 +93,11 @@ export function ChatView({ conversation }: ChatViewProps) {
               variant: "destructive",
             });
           }
-        } catch (webhookError) {
+        } catch (webhookError: Error | unknown) {
           console.error("Failed to send to n8n:", webhookError);
           toast({
             title: "Network error",
-            description: "Could not connect to n8n",
+            description: webhookError instanceof Error ? webhookError.message : "An unexpected error occurred",
             variant: "destructive",
           });
         }
@@ -104,10 +106,10 @@ export function ChatView({ conversation }: ChatViewProps) {
       }
 
       setMessageText("");
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       toast({
         title: "Failed to send message",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
     }
@@ -126,11 +128,11 @@ export function ChatView({ conversation }: ChatViewProps) {
         title: "Control taken",
         description: "You are now handling this conversation",
       });
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       toast({
-        title: "Failed to take control",
-        description: error.message,
         variant: "destructive",
+        title: "Failed to take control",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
       });
     }
   };
@@ -148,10 +150,10 @@ export function ChatView({ conversation }: ChatViewProps) {
         title: "Returned to AI",
         description: "The AI agent is now handling this conversation",
       });
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       toast({
         title: "Failed to return to AI",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
     }
@@ -255,7 +257,7 @@ export function ChatView({ conversation }: ChatViewProps) {
             <p className="text-sm text-muted-foreground">No messages yet</p>
           </div>
         ) : (
-          messages?.map((message, index) => (
+          messages.map((message: Message, i) => (
             <div
               key={message.id}
               className={`flex ${getMessageAlignment(message.senderType)}`}

@@ -46,10 +46,11 @@ export default function Login() {
         title: "Check your email",
         description: `We sent a login code to ${data.email}`,
       });
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
+      console.error('Error sending magic code:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to send login code",
+        description: error instanceof Error ? error.message : "Failed to send verification code. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -72,10 +73,11 @@ export default function Login() {
         description: "Welcome back!",
       });
       setLocation("/");
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
+      console.error('Error verifying code:', error);
       toast({
-        title: "Invalid code",
-        description: error.message || "Please check your code and try again",
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "Invalid code. Please check and try again.",
         variant: "destructive",
       });
     } finally {

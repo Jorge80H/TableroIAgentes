@@ -76,11 +76,11 @@ export default function Register() {
 
           setIsVerifying(false);
           setLocation("/");
-        } catch (error: any) {
+        } catch (error: Error | unknown) {
           console.error("Setup error:", error);
           toast({
-            title: "Setup failed",
-            description: error.message || "Failed to set up organization",
+            title: "Error creating organization",
+            description: error instanceof Error ? error.message : "Failed to create organization",
             variant: "destructive",
           });
           setIsVerifying(false);
@@ -101,10 +101,10 @@ export default function Register() {
         title: "Check your email",
         description: `We sent a verification code to ${data.email}`,
       });
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to send verification code",
+        title: "Registration failed",
+        description: error instanceof Error ? error.message : "Could not complete registration. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -122,11 +122,11 @@ export default function Register() {
         email: formData.email,
         code
       });
-    } catch (error: any) {
-      setIsVerifying(false);
+    } catch (error: Error | unknown) {
+      console.error('Error verifying code:', error);
       toast({
-        title: "Invalid code",
-        description: error.message || "Please check your code and try again",
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "Invalid code. Please check and try again.",
         variant: "destructive",
       });
     }

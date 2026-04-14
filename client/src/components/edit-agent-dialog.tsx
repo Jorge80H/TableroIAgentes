@@ -4,6 +4,7 @@ import { insertAgentSchema, type InsertAgent, type Agent } from "@shared/schema"
 import { db } from "@/lib/instant";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import type { Organization } from "@shared/schema";
 import {
   Select,
   SelectContent,
@@ -41,7 +42,7 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
   const { toast } = useToast();
   const { isSuperAdmin } = useCurrentUser();
   const { data: orgsData } = db.useQuery(isSuperAdmin ? { organizations: {} } : null);
-  const organizations = orgsData?.organizations || [];
+  const organizations = (orgsData?.organizations || []) as Organization[];
 
   const form = useForm<InsertAgent>({
     resolver: zodResolver(insertAgentSchema),
@@ -83,10 +84,10 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
         description: "Your agent has been updated successfully.",
       });
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       toast({
-        title: "Update failed",
-        description: error.message,
+        title: "Failed to update agent",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
     }
@@ -187,7 +188,7 @@ export function EditAgentDialog({ agent, open, onOpenChange }: EditAgentDialogPr
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {organizations.map((org: any) => (
+                        {organizations.map((org: Organization) => (
                           <SelectItem key={org.id} value={org.id}>
                             {org.name}
                           </SelectItem>

@@ -41,11 +41,6 @@ const menuItems = [
     icon: MessageSquare,
   },
   {
-    title: "Audit Logs",
-    url: "/audit-logs",
-    icon: ClipboardList,
-  },
-  {
     title: "Settings",
     url: "/settings",
     icon: Settings,
@@ -84,14 +79,24 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               {isSuperAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location === "/admin"}>
-                    <Link href="/admin" data-testid="link-admin">
-                      <ShieldAlert className="h-4 w-4" />
-                      <span>Admin Panel</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === "/audit-logs"}>
+                      <Link href="/audit-logs" data-testid="link-audit-logs">
+                        <ClipboardList className="h-4 w-4" />
+                        <span>Audit Logs</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === "/admin"}>
+                      <Link href="/admin" data-testid="link-admin">
+                        <ShieldAlert className="h-4 w-4" />
+                        <span>Admin Panel</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
               )}
             </SidebarMenu>
           </SidebarGroupContent>

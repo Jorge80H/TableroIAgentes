@@ -8,13 +8,16 @@ import type { Agent, Conversation } from "@shared/schema";
 
 export default function Dashboard() {
   const { organizationId, isSuperAdmin } = useCurrentUser();
-  const queryFilter = isSuperAdmin ? {} : { $: { where: { 'organization.id': organizationId || 'none' } } };
+  const agentQueryFilter = isSuperAdmin ? {} : { $: { where: { organizationId: organizationId || 'none' } } };
 
-  const { data: agentsData } = db.useQuery({ agents: queryFilter });
-  const { data: conversationsData } = db.useQuery({ conversations: queryFilter });
+  const { data: agentsData } = db.useQuery({ agents: agentQueryFilter });
+  const { data: convData } = db.useQuery({ conversations: { agent: {} } });
 
   const agents = (agentsData?.agents || []) as Agent[];
-  const conversations = (conversationsData?.conversations || []) as Conversation[];
+  const allConversations = (convData?.conversations || []) as Conversation[];
+  const conversations = isSuperAdmin 
+    ? allConversations 
+    : allConversations.filter((c: any) => c.agent?.[0]?.organizationId === organizationId);
 
   const activeAgents = agents.filter((a: Agent) => a.isActive).length;
   const totalConversations = conversations.length;
