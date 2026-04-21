@@ -71,7 +71,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
+      {/* <Route path="/register" component={Register} /> */}
       <Route component={AuthenticatedLayout} />
     </Switch>
   );

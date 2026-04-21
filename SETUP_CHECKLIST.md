@@ -83,7 +83,7 @@
 3. Ve a Netlify Dashboard → Tu sitio → Site settings → Environment variables
 4. Agrega:
    - **Name:** `INSTANT_ADMIN_TOKEN`
-   - **Value:** `[pega el token aquí]`
+   - **Value:** ``
 5. Guarda y redeploy el sitio en Netlify
 
 ---

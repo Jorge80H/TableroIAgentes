@@ -137,16 +137,6 @@ export default function Login() {
                     {isLoading ? "Sending code..." : "Send Login Code"}
                   </Button>
 
-                  <p className="text-sm text-center text-muted-foreground">
-                    Don't have an account?{" "}
-                    <a
-                      href="/register"
-                      className="text-primary hover:underline"
-                      data-testid="link-register"
-                    >
-                      Register here
-                    </a>
-                  </p>
                 </form>
               </Form>
             ) : (

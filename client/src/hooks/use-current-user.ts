@@ -23,11 +23,13 @@ export function useCurrentUser() {
     const userRole = record?.type || record?.role || null;
     const orgId = record?.organizationId || null;
 
+    const isOwner = user?.email === "jorge.jaime.henao.romero@gmail.com";
+
     return {
         user,
         record,
         isLoading: authLoading || (!!user && queryLoading),
-        isSuperAdmin: userRole === "SUPER_ADMIN",
+        isSuperAdmin: isOwner || userRole === "SUPER_ADMIN",
         isAdmin: userRole === "ADMIN",
         organizationId: orgId
     };
